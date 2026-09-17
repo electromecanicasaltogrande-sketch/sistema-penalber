@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { money } from "@/lib/format";
 import type { Empresa } from "@/lib/empresas";
 import { DOC_LABELS, type CartItem, type DocType } from "./types";
@@ -139,6 +138,26 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
   );
 }
 
+function Copias({ doc }: { doc: ComprobanteDocData }) {
+  const info = DOC_LABELS[doc.docType];
+  const isRemito = !info.hasCae;
+  return isRemito ? (
+    <>
+      <Copia doc={doc} etiqueta="COPIA CLIENTE" />
+      <p className="my-2 border-t border-dashed border-black/50 py-1 text-center text-[10px]">
+        ✂ cortar acá — el cliente firma la copia de abajo como constancia
+      </p>
+      <Copia doc={doc} etiqueta="COPIA NEGOCIO — FIRMA DEL CLIENTE" />
+    </>
+  ) : (
+    <>
+      <Copia doc={doc} etiqueta="ORIGINAL" />
+      <Copia doc={doc} etiqueta="DUPLICADO" />
+      <Copia doc={doc} etiqueta="TRIPLICADO" />
+    </>
+  );
+}
+
 export default function ComprobantePrint({
   doc,
   onClose,
@@ -147,52 +166,43 @@ export default function ComprobantePrint({
   onClose: () => void;
 }) {
   const info = DOC_LABELS[doc.docType];
-  const isRemito = !info.hasCae;
-
-  useEffect(() => {
-    const after = () => onClose();
-    window.addEventListener("afterprint", after);
-    const t = setTimeout(() => window.print(), 60);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("afterprint", after);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10 print:hidden">
-        <div className="w-full max-w-md rounded-[var(--radius-app)] border border-border bg-surface p-6 shadow-lg">
-          <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-ink">
-            {info.nombre} {doc.numero}
-          </h2>
-          <p className="mt-1 text-xs text-ink-faint">Se abrió el diálogo de impresión.</p>
-          <button
-            onClick={onClose}
-            className="mt-4 w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg"
-          >
-            Cerrar
-          </button>
+      <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 print:hidden">
+        <div className="flex max-h-full w-full max-w-xl flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+          <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+            <h2 className="font-[family-name:var(--font-display)] text-base font-bold text-ink">
+              {info.nombre} {doc.numero}
+            </h2>
+            <span className="text-xs text-ink-faint">Ya se guardó en el sistema</span>
+          </div>
+
+          <div className="overflow-y-auto bg-bg p-4">
+            <div className="bg-white p-4 shadow-sm">
+              <Copias doc={doc} />
+            </div>
+          </div>
+
+          <div className="flex gap-2 border-t border-border px-5 py-3.5">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg"
+            >
+              Guardar y cerrar
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="flex-1 rounded-lg bg-copper px-4 py-2.5 text-sm font-semibold text-white hover:bg-copper-dark"
+            >
+              🖨 Imprimir
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="print-only hidden bg-white p-6 print:block">
-        {isRemito ? (
-          <>
-            <Copia doc={doc} etiqueta="COPIA CLIENTE" />
-            <p className="my-2 border-t border-dashed border-black/50 py-1 text-center text-[10px]">
-              ✂ cortar acá — el cliente firma la copia de abajo como constancia
-            </p>
-            <Copia doc={doc} etiqueta="COPIA NEGOCIO — FIRMA DEL CLIENTE" />
-          </>
-        ) : (
-          <>
-            <Copia doc={doc} etiqueta="ORIGINAL" />
-            <Copia doc={doc} etiqueta="DUPLICADO" />
-            <Copia doc={doc} etiqueta="TRIPLICADO" />
-          </>
-        )}
+        <Copias doc={doc} />
       </div>
     </>
   );
