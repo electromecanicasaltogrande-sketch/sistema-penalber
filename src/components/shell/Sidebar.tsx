@@ -28,7 +28,9 @@ export default function Sidebar({ rol }: { rol: Rol }) {
             </p>
             {group.items.map((item) => {
               const active =
-                item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link
                   key={item.href}

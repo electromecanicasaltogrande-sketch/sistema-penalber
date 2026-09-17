@@ -63,7 +63,11 @@ export function navForRol(rol: Rol): NavGroup[] {
 export function sectionTitle(pathname: string): string {
   for (const group of NAV) {
     for (const item of group.items) {
-      if (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)) {
+      if (
+        item.href === "/"
+          ? pathname === "/"
+          : pathname === item.href || pathname.startsWith(item.href + "/")
+      ) {
         return item.label;
       }
     }
