@@ -11,7 +11,7 @@ export default async function PresupuestosTallerPage() {
       .from("articulos")
       .select("id, codigo, descripcion, marca, rubro, costo, precio_minorista, precio_mayorista, iva, codigo_barras, foto_url, stock, stock_minimo")
       .order("codigo"),
-    supabase.from("clientes").select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final"),
+    supabase.from("clientes").select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default"),
     supabase
       .from("presupuestos_taller")
       .select("id, numero, cliente_nombre, cliente_telefono, subtotal, descuento, discrimina_iva, estado, cobro_no_hizo, creado_en")

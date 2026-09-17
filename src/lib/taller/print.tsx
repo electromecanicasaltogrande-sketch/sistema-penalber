@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { money } from "@/lib/format";
+import { descargarComoPDF } from "@/lib/print-pdf";
 import type { CartItem } from "@/lib/ventas/types";
 
 export interface ReciboTallerData {
@@ -19,10 +21,10 @@ export interface ReciboTallerData {
 function Contenido({ doc }: { doc: ReciboTallerData }) {
   return (
     <div className="bg-white p-8 text-black">
-      <div className="flex items-start justify-between border-b border-black/40 pb-3">
+      <div className="flex items-start justify-between border-b line-40 pb-3">
         <div>
           <p className="font-bold">Electrotécnica Peñalber — Taller</p>
-          <p className="text-xs text-black/70">Tavella 1487, Concordia, Entre Ríos</p>
+          <p className="text-xs ink-70">Tavella 1487, Concordia, Entre Ríos</p>
         </div>
         <div className="text-right">
           <p className="font-bold">
@@ -41,7 +43,7 @@ function Contenido({ doc }: { doc: ReciboTallerData }) {
 
       <table className="mt-3 w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-black/40 text-left">
+          <tr className="border-b line-40 text-left">
             <th className="py-1.5">Cant.</th>
             <th className="py-1.5">Descripción</th>
             <th className="py-1.5 text-right">P. Unit.</th>
@@ -50,7 +52,7 @@ function Contenido({ doc }: { doc: ReciboTallerData }) {
         </thead>
         <tbody>
           {doc.items.map((it, i) => (
-            <tr key={i} className="border-b border-black/10">
+            <tr key={i} className="border-b line-10">
               <td className="py-1.5">{it.cantidad}</td>
               <td className="py-1.5">{it.descripcion}</td>
               <td className="py-1.5 text-right">{money(it.precio)}</td>
@@ -62,12 +64,12 @@ function Contenido({ doc }: { doc: ReciboTallerData }) {
 
       <div className="mt-3 flex justify-end">
         <div className="w-56 text-sm">
-          <div className="flex justify-between border-b border-black/10 py-1">
+          <div className="flex justify-between border-b line-10 py-1">
             <span>Subtotal</span>
             <span>{money(doc.subtotal)}</span>
           </div>
           {doc.descuento > 0 && (
-            <div className="flex justify-between border-b border-black/10 py-1">
+            <div className="flex justify-between border-b line-10 py-1">
               <span>Descuento</span>
               <span>-{money(doc.descuento)}</span>
             </div>
@@ -80,17 +82,37 @@ function Contenido({ doc }: { doc: ReciboTallerData }) {
       </div>
 
       <div className="mt-16 flex justify-end">
-        <div className="w-56 border-t border-black/40 pt-1.5 text-center text-xs">Firma</div>
+        <div className="w-56 border-t line-40 pt-1.5 text-center text-xs">Firma</div>
       </div>
     </div>
   );
 }
 
 export default function ReciboTaller({ doc, onClose }: { doc: ReciboTallerData; onClose: () => void }) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  async function guardar() {
+    if (!previewRef.current) return;
+    setGuardando(true);
+    try {
+      await descargarComoPDF(previewRef.current, `${doc.numero.replace(/\s+/g, "_")}.pdf`);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 print:hidden">
-        <div className="flex max-h-full w-full max-w-lg flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+        <div className="relative flex max-h-full w-full max-w-lg flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="absolute -left-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-soft shadow-sm hover:text-danger"
+          >
+            ✕
+          </button>
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
             <h2 className="font-[family-name:var(--font-display)] text-base font-bold text-ink">
               {doc.titulo} {doc.numero}
@@ -99,17 +121,18 @@ export default function ReciboTaller({ doc, onClose }: { doc: ReciboTallerData; 
           </div>
 
           <div className="overflow-y-auto bg-bg p-4">
-            <div className="shadow-sm">
+            <div ref={previewRef} className="shadow-sm">
               <Contenido doc={doc} />
             </div>
           </div>
 
           <div className="flex gap-2 border-t border-border px-5 py-3.5">
             <button
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg"
+              onClick={guardar}
+              disabled={guardando}
+              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg disabled:opacity-60"
             >
-              Guardar y cerrar
+              {guardando ? "Generando…" : "Guardar"}
             </button>
             <button
               onClick={() => window.print()}

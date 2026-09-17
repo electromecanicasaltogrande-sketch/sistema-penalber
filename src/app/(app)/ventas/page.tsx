@@ -15,7 +15,7 @@ export default async function VentasPage() {
       .order("codigo"),
     supabase
       .from("clientes")
-      .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final")
+      .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default")
       .order("razon_social"),
   ]);
 

@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { money } from "@/lib/format";
 import type { Empresa } from "@/lib/empresas";
+import { descargarComoPDF } from "@/lib/print-pdf";
 import { DOC_LABELS, type CartItem, type DocType } from "./types";
 
 export interface ComprobanteDocData {
@@ -31,14 +33,14 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
   const iva = doc.total - neto;
 
   return (
-    <div className="mb-6 border border-black/70 p-5 text-[11px] text-black last:mb-0">
-      <div className="mb-2 text-center text-[10px] font-bold tracking-widest text-black/60">
+    <div className="border line-70 p-5 text-[11px] text-black">
+      <div className="mb-2 text-center text-[10px] font-bold tracking-widest ink-60">
         {etiqueta}
       </div>
-      <div className="flex items-start justify-between border-b border-black/40 pb-2">
+      <div className="flex items-start justify-between border-b line-40 pb-2">
         <div className="w-1/3">
           <p className="font-bold">{doc.empresa.razonSocial}</p>
-          <p className="mt-1 leading-snug text-black/70">
+          <p className="mt-1 leading-snug ink-70">
             Tavella 1487, Concordia, Entre Ríos
             <br />
             Tel.: (0345) 000-0000 · WhatsApp disponible
@@ -46,7 +48,7 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
             Resp. Inscripto
           </p>
         </div>
-        <div className="flex w-16 flex-col items-center border border-black/50 py-1 text-center">
+        <div className="flex w-16 flex-col items-center border line-50 py-1 text-center">
           <span className="text-2xl font-bold">{info.letra}</span>
           <span className="text-[8px]">COD.{isRemito ? "91" : "01"}</span>
         </div>
@@ -58,7 +60,7 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
         </div>
       </div>
 
-      <div className="border-b border-black/40 py-2">
+      <div className="border-b line-40 py-2">
         <p>
           <b>CLIENTE:</b> {doc.clienteNombre} {doc.dni ? `DNI: ${doc.dni}` : ""}
         </p>
@@ -69,7 +71,7 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
 
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-black/40 text-left">
+          <tr className="border-b line-40 text-left">
             <th className="py-1">CANT.</th>
             <th className="py-1">CÓDIGO</th>
             <th className="py-1">DESCRIPCIÓN</th>
@@ -80,7 +82,7 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
         </thead>
         <tbody>
           {doc.items.map((it, i) => (
-            <tr key={i} className="border-b border-black/10">
+            <tr key={i} className="border-b line-10">
               <td className="py-1">{it.cantidad}</td>
               <td className="py-1">{it.codigo || "S/C"}</td>
               <td className="py-1">
@@ -101,15 +103,15 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
           <p className="mt-2">IVA 21,00 {iva.toFixed(2)}</p>
         </div>
         <div className="w-48">
-          <div className="flex justify-between border-b border-black/10 py-0.5">
+          <div className="flex justify-between border-b line-10 py-0.5">
             <span>NETO $:</span>
             <span>{neto.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between border-b border-black/10 py-0.5">
+          <div className="flex justify-between border-b line-10 py-0.5">
             <span>BONIF $:</span>
             <span>{doc.descuento.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between border-b border-black/10 py-0.5">
+          <div className="flex justify-between border-b line-10 py-0.5">
             <span>IVA $:</span>
             <span>{iva.toFixed(2)}</span>
           </div>
@@ -121,7 +123,7 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
       </div>
 
       {!isRemito ? (
-        <div className="mt-3 flex items-center justify-between border-t border-black/40 pt-2">
+        <div className="mt-3 flex items-center justify-between border-t line-40 pt-2">
           <div>
             CAE N°: {doc.cae} &nbsp;&nbsp; Vto. CAE: {doc.caeVencimiento}
           </div>
@@ -129,9 +131,9 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
         </div>
       ) : (
         <div className="mt-6 flex justify-end gap-10 text-center text-[10px]">
-          <div className="w-32 border-t border-black/50 pt-1">Firma del cliente</div>
-          <div className="w-32 border-t border-black/50 pt-1">Aclaración</div>
-          <div className="w-24 border-t border-black/50 pt-1">DNI</div>
+          <div className="w-32 border-t line-50 pt-1">Firma del cliente</div>
+          <div className="w-32 border-t line-50 pt-1">Aclaración</div>
+          <div className="w-24 border-t line-50 pt-1">DNI</div>
         </div>
       )}
     </div>
@@ -141,19 +143,28 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
 function Copias({ doc }: { doc: ComprobanteDocData }) {
   const info = DOC_LABELS[doc.docType];
   const isRemito = !info.hasCae;
-  return isRemito ? (
+
+  if (isRemito) {
+    return (
+      <div data-pdf-page className="print-remito-page bg-white p-4">
+        <Copia doc={doc} etiqueta="COPIA CLIENTE" />
+        <div className="my-2 border-t border-dashed line-40" />
+        <Copia doc={doc} etiqueta="COPIA NEGOCIO — FIRMA DEL CLIENTE" />
+      </div>
+    );
+  }
+
+  return (
     <>
-      <Copia doc={doc} etiqueta="COPIA CLIENTE" />
-      <p className="my-2 border-t border-dashed border-black/50 py-1 text-center text-[10px]">
-        ✂ cortar acá — el cliente firma la copia de abajo como constancia
-      </p>
-      <Copia doc={doc} etiqueta="COPIA NEGOCIO — FIRMA DEL CLIENTE" />
-    </>
-  ) : (
-    <>
-      <Copia doc={doc} etiqueta="ORIGINAL" />
-      <Copia doc={doc} etiqueta="DUPLICADO" />
-      <Copia doc={doc} etiqueta="TRIPLICADO" />
+      <div data-pdf-page className="print-page-full bg-white p-6">
+        <Copia doc={doc} etiqueta="ORIGINAL" />
+      </div>
+      <div data-pdf-page className="print-page-full bg-white p-6">
+        <Copia doc={doc} etiqueta="DUPLICADO" />
+      </div>
+      <div data-pdf-page className="print-page-full bg-white p-6">
+        <Copia doc={doc} etiqueta="TRIPLICADO" />
+      </div>
     </>
   );
 }
@@ -166,11 +177,30 @@ export default function ComprobantePrint({
   onClose: () => void;
 }) {
   const info = DOC_LABELS[doc.docType];
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  async function guardar() {
+    if (!previewRef.current) return;
+    setGuardando(true);
+    try {
+      await descargarComoPDF(previewRef.current, `${doc.numero.replace(/\s+/g, "_")}.pdf`);
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 print:hidden">
-        <div className="flex max-h-full w-full max-w-xl flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+        <div className="relative flex max-h-full w-full max-w-xl flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="absolute -left-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-soft shadow-sm hover:text-danger"
+          >
+            ✕
+          </button>
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
             <h2 className="font-[family-name:var(--font-display)] text-base font-bold text-ink">
               {info.nombre} {doc.numero}
@@ -179,17 +209,18 @@ export default function ComprobantePrint({
           </div>
 
           <div className="overflow-y-auto bg-bg p-4">
-            <div className="bg-white p-4 shadow-sm">
+            <div ref={previewRef} className="flex flex-col gap-3 shadow-sm">
               <Copias doc={doc} />
             </div>
           </div>
 
           <div className="flex gap-2 border-t border-border px-5 py-3.5">
             <button
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg"
+              onClick={guardar}
+              disabled={guardando}
+              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg disabled:opacity-60"
             >
-              Guardar y cerrar
+              {guardando ? "Generando…" : "Guardar"}
             </button>
             <button
               onClick={() => window.print()}
@@ -201,7 +232,7 @@ export default function ComprobantePrint({
         </div>
       </div>
 
-      <div className="print-only hidden bg-white p-6 print:block">
+      <div className="print-only hidden print:block">
         <Copias doc={doc} />
       </div>
     </>

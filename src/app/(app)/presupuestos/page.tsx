@@ -8,7 +8,7 @@ export default async function PresupuestosPage() {
   const supabase = await createClient();
   const [{ data: clientesData }, { data: articulosData }, { data: configData }, { data: presupuestosData }] =
     await Promise.all([
-      supabase.from("clientes").select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final").order("razon_social"),
+      supabase.from("clientes").select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default").order("razon_social"),
       supabase
         .from("articulos")
         .select("id, codigo, descripcion, marca, rubro, costo, precio_minorista, precio_mayorista, iva, codigo_barras, foto_url, stock, stock_minimo")

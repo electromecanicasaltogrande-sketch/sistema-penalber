@@ -14,6 +14,7 @@ import {
   type CtaCteComprobanteRow,
 } from "@/lib/clientes/types";
 import { distribuirPago } from "@/lib/clientes/payment";
+import { DOC_LABELS } from "@/lib/ventas/types";
 import ReciboPago, { type ReciboData } from "./ReciboPago";
 
 type Tab = "deuda" | "pago" | "datos";
@@ -50,6 +51,7 @@ export default function ClienteFicha({
   const [telefono, setTelefono] = useState(cliente.telefono);
   const [direccion, setDireccion] = useState(cliente.direccion);
   const [localidad, setLocalidad] = useState(cliente.localidad);
+  const [tipoComprobanteDefault, setTipoComprobanteDefault] = useState(cliente.tipoComprobanteDefault ?? "");
   const [savingDatos, setSavingDatos] = useState(false);
 
   useEffect(() => {
@@ -58,6 +60,7 @@ export default function ClienteFicha({
     setTelefono(cliente.telefono);
     setDireccion(cliente.direccion);
     setLocalidad(cliente.localidad);
+    setTipoComprobanteDefault(cliente.tipoComprobanteDefault ?? "");
     setSeleccionadas([]);
     setTab("deuda");
   }, [cliente.id]);
@@ -249,11 +252,20 @@ export default function ClienteFicha({
         telefono: telefono.trim(),
         direccion: direccion.trim(),
         localidad: localidad.trim(),
+        tipo_comprobante_default: tipoComprobanteDefault || null,
       })
       .eq("id", cliente.id);
     setSavingDatos(false);
     if (err) return setError(err.message);
-    onUpdated({ ...cliente, razonSocial, cuit, telefono, direccion, localidad });
+    onUpdated({
+      ...cliente,
+      razonSocial,
+      cuit,
+      telefono,
+      direccion,
+      localidad,
+      tipoComprobanteDefault: tipoComprobanteDefault || null,
+    });
   }
 
   async function eliminarCliente() {
@@ -513,6 +525,26 @@ export default function ClienteFicha({
           <div className="flex flex-col gap-1">
             <label className={LABEL}>Localidad</label>
             <input className={FIELD} value={localidad} onChange={(e) => setLocalidad(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={LABEL}>Tipo de comprobante que se le hace habitualmente</label>
+            <select
+              className={FIELD}
+              value={tipoComprobanteDefault}
+              onChange={(e) => setTipoComprobanteDefault(e.target.value)}
+            >
+              <option value="">Sin definir</option>
+              {Object.entries(DOC_LABELS)
+                .filter(([k]) => !k.startsWith("nc_"))
+                .map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.nombre}
+                  </option>
+                ))}
+            </select>
+            <p className="mt-0.5 text-[11px] text-ink-faint">
+              Se preselecciona solo al elegir este cliente en Ventas — siempre se puede cambiar ahí.
+            </p>
           </div>
 
           <button

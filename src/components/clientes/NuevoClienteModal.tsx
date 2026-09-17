@@ -37,7 +37,7 @@ export default function NuevoClienteModal({
         direccion: direccion.trim(),
         localidad: localidad.trim(),
       })
-      .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final")
+      .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default")
       .single();
     setSaving(false);
     if (err) return setError(err.message);

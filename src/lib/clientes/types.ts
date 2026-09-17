@@ -6,6 +6,7 @@ export interface Cliente {
   direccion: string;
   localidad: string;
   esConsumidorFinal: boolean;
+  tipoComprobanteDefault: string | null;
 }
 
 export interface ClienteRow {
@@ -16,6 +17,7 @@ export interface ClienteRow {
   direccion: string;
   localidad: string;
   es_consumidor_final: boolean;
+  tipo_comprobante_default: string | null;
 }
 
 export function clienteFromRow(r: ClienteRow): Cliente {
@@ -27,6 +29,7 @@ export function clienteFromRow(r: ClienteRow): Cliente {
     direccion: r.direccion,
     localidad: r.localidad,
     esConsumidorFinal: r.es_consumidor_final,
+    tipoComprobanteDefault: r.tipo_comprobante_default,
   };
 }
 

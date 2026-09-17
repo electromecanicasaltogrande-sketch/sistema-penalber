@@ -123,6 +123,9 @@ export default function VentasView({
     } else {
       applyConsFinalRules(c, condicionPago);
     }
+    if (!c?.esConsumidorFinal && c?.tipoComprobanteDefault && !isNC) {
+      setDocTypeState(c.tipoComprobanteDefault as DocType);
+    }
     if (isNC) loadNcOptions(c);
   }
 

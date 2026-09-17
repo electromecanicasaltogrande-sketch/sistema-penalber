@@ -52,7 +52,42 @@ body {
   color: var(--ink);
 }
 
+/* Colores sólidos (sin color-mix/oklab) para los documentos imprimibles —
+   html2canvas no puede parsear las funciones de color modernas que generan
+   los modificadores de opacidad de Tailwind (ej. border-black/40). */
+.ink-70 {
+  color: #4d4d4d;
+}
+.ink-60 {
+  color: #666666;
+}
+.line-70 {
+  border-color: #4d4d4d;
+}
+.line-50 {
+  border-color: #808080;
+}
+.line-40 {
+  border-color: #999999;
+}
+.line-30 {
+  border-color: #b3b3b3;
+}
+.line-10 {
+  border-color: #e6e6e6;
+}
+.fill-40 {
+  background-color: #999999;
+}
+.overlay-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
 @media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
   body * {
     visibility: hidden;
   }
@@ -64,5 +99,29 @@ body {
     display: block !important;
     position: absolute;
     inset: 0;
+  }
+  /* Cada hoja de factura/NC ocupa una página completa. */
+  .print-page-full {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: calc(100vh - 16mm);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-page-full:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  /* El remito ocupa toda la hoja en una sola página, sin salto entre copias. */
+  .print-remito-page {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: calc(100vh - 16mm);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 }

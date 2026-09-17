@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { money } from "@/lib/format";
+import { descargarComoPDF } from "@/lib/print-pdf";
 import type { CartItem } from "@/lib/ventas/types";
 import type { PresupuestoConfig } from "./types";
 
@@ -16,10 +18,10 @@ export interface PresupuestoPrintData {
 function Contenido({ doc }: { doc: PresupuestoPrintData }) {
   return (
     <div className="bg-white p-8 text-black">
-      <div className="flex items-start justify-between border-b border-black/40 pb-3">
+      <div className="flex items-start justify-between border-b line-40 pb-3">
         <div>
           <p className="font-bold">Electrotécnica Peñalber</p>
-          <p className="text-xs text-black/70">Tavella 1487, Concordia, Entre Ríos</p>
+          <p className="text-xs ink-70">Tavella 1487, Concordia, Entre Ríos</p>
         </div>
         <div className="text-right">
           <p className="font-bold">PRESUPUESTO N° {doc.numero}</p>
@@ -34,7 +36,7 @@ function Contenido({ doc }: { doc: PresupuestoPrintData }) {
 
       <table className="mt-3 w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-black/40 text-left">
+          <tr className="border-b line-40 text-left">
             <th className="py-1.5">Cant.</th>
             <th className="py-1.5">Código</th>
             <th className="py-1.5">Descripción</th>
@@ -44,7 +46,7 @@ function Contenido({ doc }: { doc: PresupuestoPrintData }) {
         </thead>
         <tbody>
           {doc.items.map((it, i) => (
-            <tr key={i} className="border-b border-black/10">
+            <tr key={i} className="border-b line-10">
               <td className="py-1.5">{it.cantidad}</td>
               <td className="py-1.5">{it.codigo ?? "S/C"}</td>
               <td className="py-1.5">{it.descripcion}</td>
@@ -56,20 +58,20 @@ function Contenido({ doc }: { doc: PresupuestoPrintData }) {
       </table>
 
       <div className="mt-3 flex justify-end">
-        <div className="w-56 border-t border-black/40 pt-1.5 text-right text-base font-bold">
+        <div className="w-56 border-t line-40 pt-1.5 text-right text-base font-bold">
           Total: {money(doc.total)}
         </div>
       </div>
 
-      <p className="mt-6 whitespace-pre-line text-xs text-black/70">{doc.config.observaciones}</p>
-      <p className="mt-2 text-xs text-black/70">
+      <p className="mt-6 whitespace-pre-line text-xs ink-70">{doc.config.observaciones}</p>
+      <p className="mt-2 text-xs ink-70">
         Este presupuesto caduca en {doc.config.diasValidez} días a partir de la fecha.
       </p>
 
       <div className="mt-16 flex justify-end">
-        <div className="w-56 border-t border-black/40 pt-1.5 text-center text-xs">
+        <div className="w-56 border-t line-40 pt-1.5 text-center text-xs">
           <p>{doc.config.firma}</p>
-          {doc.config.mostrarEmpresa && <p className="text-black/60">Electrotécnica Peñalber</p>}
+          {doc.config.mostrarEmpresa && <p className="ink-60">Electrotécnica Peñalber</p>}
         </div>
       </div>
     </div>
@@ -83,10 +85,30 @@ export default function PresupuestoPrint({
   doc: PresupuestoPrintData;
   onClose: () => void;
 }) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  async function guardar() {
+    if (!previewRef.current) return;
+    setGuardando(true);
+    try {
+      await descargarComoPDF(previewRef.current, `${doc.numero.replace(/\s+/g, "_")}.pdf`);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 print:hidden">
-        <div className="flex max-h-full w-full max-w-xl flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+        <div className="relative flex max-h-full w-full max-w-xl flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="absolute -left-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-soft shadow-sm hover:text-danger"
+          >
+            ✕
+          </button>
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
             <h2 className="font-[family-name:var(--font-display)] text-base font-bold text-ink">
               Presupuesto {doc.numero}
@@ -95,17 +117,18 @@ export default function PresupuestoPrint({
           </div>
 
           <div className="overflow-y-auto bg-bg p-4">
-            <div className="shadow-sm">
+            <div ref={previewRef} className="shadow-sm">
               <Contenido doc={doc} />
             </div>
           </div>
 
           <div className="flex gap-2 border-t border-border px-5 py-3.5">
             <button
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg"
+              onClick={guardar}
+              disabled={guardando}
+              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-ink-soft hover:bg-bg disabled:opacity-60"
             >
-              Guardar y cerrar
+              {guardando ? "Generando…" : "Guardar"}
             </button>
             <button
               onClick={() => window.print()}
