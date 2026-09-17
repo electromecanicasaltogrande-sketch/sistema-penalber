@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { articleMatches } from "@/lib/search";
 import { money } from "@/lib/format";
@@ -63,6 +64,41 @@ export default function VentasView({
   const [printDoc, setPrintDoc] = useState<ComprobanteDocData | null>(null);
 
   const [ventasHoy, setVentasHoy] = useState<VentaHoy[]>([]);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const presupuestoId = searchParams.get("presupuesto");
+    if (!presupuestoId) return;
+    (async () => {
+      const supabase = createClient();
+      const { data: p } = await supabase
+        .from("presupuestos_venta")
+        .select("cliente_id, cliente_nombre")
+        .eq("id", presupuestoId)
+        .single();
+      const { data: items } = await supabase
+        .from("presupuesto_venta_items")
+        .select("codigo, descripcion, marca, cantidad, precio, iva")
+        .eq("presupuesto_id", presupuestoId);
+      if (items) {
+        setCart(
+          items.map((it) => ({
+            codigo: it.codigo,
+            descripcion: it.descripcion,
+            marca: it.marca ?? "",
+            cantidad: Number(it.cantidad),
+            precio: Number(it.precio),
+            iva: Number(it.iva),
+          })),
+        );
+      }
+      if (p) {
+        const match = clientes.find((c) => c.razonSocial === p.cliente_nombre);
+        if (match) selectCliente(match);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const isConsumidorFinal = selectedCliente?.esConsumidorFinal ?? true;
   const isNC = docType === "nc_a" || docType === "nc_b";

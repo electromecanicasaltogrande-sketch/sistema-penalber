@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { fromRow, type ArticuloRow } from "@/lib/articulos/types";
 import { clienteFromRow, type ClienteRow } from "@/lib/clientes/types";
@@ -21,5 +22,9 @@ export default async function VentasPage() {
   const articulos = ((articulosData as ArticuloRow[]) ?? []).map(fromRow);
   const clientes = ((clientesData as ClienteRow[]) ?? []).map(clienteFromRow);
 
-  return <VentasView initialArticulos={articulos} initialClientes={clientes} />;
+  return (
+    <Suspense>
+      <VentasView initialArticulos={articulos} initialClientes={clientes} />
+    </Suspense>
+  );
 }
