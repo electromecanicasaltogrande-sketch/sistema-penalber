@@ -207,7 +207,6 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
               <th className="px-2.5 py-2">Descripción</th>
               <th className="px-2.5 py-2">Marca</th>
               <th className="px-2.5 py-2">Rubro</th>
-              <th className="px-2.5 py-2">Costo</th>
               <th className="px-2.5 py-2">P. Minorista</th>
               <th className="px-2.5 py-2">P. Mayorista</th>
               <th className="px-2.5 py-2">IVA</th>
@@ -245,7 +244,6 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
                 <td className="px-2.5 py-2.5">{a.descripcion}</td>
                 <td className="px-2.5 py-2.5">{a.marca}</td>
                 <td className="px-2.5 py-2.5">{a.rubro}</td>
-                <td className="px-2.5 py-2.5 font-mono text-xs">{money(a.costo)}</td>
                 <td className="px-2.5 py-2.5 font-mono text-xs">{money(a.precioMinorista)}</td>
                 <td className="px-2.5 py-2.5 font-mono text-xs">{money(a.precioMayorista)}</td>
                 <td className="px-2.5 py-2.5 font-mono text-xs">{a.iva}%</td>

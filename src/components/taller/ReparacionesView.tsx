@@ -13,8 +13,9 @@ import ChequeModal, { type ChequeData } from "@/components/ventas/ChequeModal";
 import ReciboTaller, { type ReciboTallerData } from "@/lib/taller/print";
 import { reparacionFromRow, type Reparacion, type ReparacionRow } from "@/lib/taller/types";
 
-const FIELD =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
+const FIELD_BASE =
+  "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
+const FIELD = `${FIELD_BASE} w-full`;
 
 export default function ReparacionesView({
   initialArticulos,
@@ -310,9 +311,9 @@ export default function ReparacionesView({
             </div>
           ) : (
             <div className="flex gap-2">
-              <input value={manDesc} onChange={(e) => setManDesc(e.target.value)} placeholder="Descripción / mano de obra" className={`${FIELD} flex-1`} />
-              <input type="number" value={manQty} onChange={(e) => setManQty(e.target.value)} className={`${FIELD} w-16`} />
-              <input type="number" value={manPrice} onChange={(e) => setManPrice(e.target.value)} placeholder="Precio" className={`${FIELD} w-28`} />
+              <input value={manDesc} onChange={(e) => setManDesc(e.target.value)} placeholder="Descripción / mano de obra" className={`${FIELD_BASE} flex-1`} />
+              <input type="number" value={manQty} onChange={(e) => setManQty(e.target.value)} className={`${FIELD_BASE} w-16`} />
+              <input type="number" value={manPrice} onChange={(e) => setManPrice(e.target.value)} placeholder="Precio" className={`${FIELD_BASE} w-28`} />
               <button onClick={addManual} className="whitespace-nowrap rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-white">
                 Agregar
               </button>

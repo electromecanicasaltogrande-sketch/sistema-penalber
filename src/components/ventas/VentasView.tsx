@@ -22,8 +22,9 @@ interface VentaHoy {
   hora: string;
 }
 
-const FIELD =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
+const FIELD_BASE =
+  "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
+const FIELD = `${FIELD_BASE} w-full`;
 
 export default function VentasView({
   initialArticulos,
@@ -466,20 +467,20 @@ export default function VentasView({
                 value={manDesc}
                 onChange={(e) => setManDesc(e.target.value)}
                 placeholder="Descripción"
-                className={`${FIELD} flex-1`}
+                className={`${FIELD_BASE} flex-1`}
               />
               <input
                 type="number"
                 value={manQty}
                 onChange={(e) => setManQty(e.target.value)}
-                className={`${FIELD} w-20`}
+                className={`${FIELD_BASE} w-20`}
               />
               <input
                 type="number"
                 value={manPrice}
                 onChange={(e) => setManPrice(e.target.value)}
                 placeholder="Precio"
-                className={`${FIELD} w-32`}
+                className={`${FIELD_BASE} w-32`}
               />
               <button
                 onClick={addManual}

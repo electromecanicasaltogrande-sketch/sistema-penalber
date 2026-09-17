@@ -20,13 +20,15 @@ interface FilaImport {
   existe: boolean;
 }
 
+// El precio de venta se actualiza siempre (aunque no cambie) en los artículos
+// ya existentes — nunca es opcional. Estos campos sí son opcionales, y la
+// foto del artículo nunca se toca desde acá.
 const CAMPOS = [
   { id: "descripcion", label: "Descripción" },
   { id: "marca", label: "Marca" },
   { id: "rubro", label: "Rubro" },
   { id: "costo", label: "Costo" },
   { id: "iva", label: "IVA" },
-  { id: "precioVenta", label: "Precio de venta" },
 ] as const;
 
 export default function ImportarExcelTab({
@@ -95,16 +97,14 @@ export default function ImportarExcelTab({
 
     for (const f of filas) {
       if (f.existe) {
-        const patch: Record<string, unknown> = {};
+        // El precio de venta se pisa siempre; la foto nunca se toca acá.
+        const patch: Record<string, unknown> = { precio_minorista: f.precioVenta };
         if (campos.has("descripcion")) patch.descripcion = f.descripcion;
         if (campos.has("marca")) patch.marca = f.marca;
         if (campos.has("rubro")) patch.rubro = f.rubro;
         if (campos.has("costo")) patch.costo = f.costo;
         if (campos.has("iva")) patch.iva = f.iva;
-        if (campos.has("precioVenta")) patch.precio_minorista = f.precioVenta;
-        if (Object.keys(patch).length > 0) {
-          await supabase.from("articulos").update(patch).ilike("codigo", f.codigo);
-        }
+        await supabase.from("articulos").update(patch).ilike("codigo", f.codigo);
         actualizados++;
       } else {
         await supabase.from("articulos").insert({
@@ -148,7 +148,10 @@ export default function ImportarExcelTab({
       {filas.length > 0 && (
         <>
           <div className="mb-4 rounded-[var(--radius-app)] border border-border bg-surface p-4">
-            <p className="mb-2 text-sm font-semibold text-ink">¿Qué modificar en caso de artículos ya cargados?</p>
+            <p className="mb-1 text-sm font-semibold text-ink">¿Qué modificar en caso de artículos ya cargados?</p>
+            <p className="mb-2 text-xs text-ink-faint">
+              El precio de venta se actualiza siempre. La foto del artículo nunca se toca desde acá.
+            </p>
             <div className="mb-2 flex gap-3 text-xs">
               <button onClick={() => setCampos(new Set(CAMPOS.map((c) => c.id)))} className="font-semibold text-copper hover:underline">
                 Seleccionar todos

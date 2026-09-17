@@ -14,8 +14,9 @@ import PresupuestoPrint, { type PresupuestoPrintData } from "@/lib/presupuestos/
 type TopTab = "nuevo" | "historial";
 type SubTab = "datos" | "config";
 
-const FIELD =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
+const FIELD_BASE =
+  "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
+const FIELD = `${FIELD_BASE} w-full`;
 const LABEL = "text-xs font-semibold text-ink-soft";
 
 export default function PresupuestosView({
@@ -352,9 +353,9 @@ export default function PresupuestosView({
                     </div>
                   ) : (
                     <div className="flex gap-2">
-                      <input value={manDesc} onChange={(e) => setManDesc(e.target.value)} placeholder="Descripción" className={`${FIELD} flex-1`} />
-                      <input type="number" value={manQty} onChange={(e) => setManQty(e.target.value)} className={`${FIELD} w-16`} />
-                      <input type="number" value={manPrice} onChange={(e) => setManPrice(e.target.value)} placeholder="Precio" className={`${FIELD} w-28`} />
+                      <input value={manDesc} onChange={(e) => setManDesc(e.target.value)} placeholder="Descripción" className={`${FIELD_BASE} flex-1`} />
+                      <input type="number" value={manQty} onChange={(e) => setManQty(e.target.value)} className={`${FIELD_BASE} w-16`} />
+                      <input type="number" value={manPrice} onChange={(e) => setManPrice(e.target.value)} placeholder="Precio" className={`${FIELD_BASE} w-28`} />
                       <button onClick={addManual} className="whitespace-nowrap rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-white">
                         Agregar
                       </button>
