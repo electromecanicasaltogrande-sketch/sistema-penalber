@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "penalber-dev",
+      "runtimeExecutable": "C:\\Users\\tomiz\\Desktop\\CLAUDE\\SOFTWARE PEÑALBER\\.claude\\dev-wrapper.cmd",
+      "runtimeArgs": [],
+      "port": 3000
+    }
+  ]
+}

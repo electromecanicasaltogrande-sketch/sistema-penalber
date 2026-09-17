@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f3ef;
+  --surface: #ffffff;
+  --ink: #1b2028;
+  --ink-soft: #5b6472;
+  --ink-faint: #9198a3;
+  --sidebar: #171b24;
+  --sidebar-ink: #c7cbd4;
+  --sidebar-ink-dim: #767e8c;
+  --copper: #be6a2e;
+  --copper-dark: #9a5322;
+  --copper-soft: #f4e3ce;
+  --success: #2f8f5b;
+  --success-soft: #e4f3ea;
+  --danger: #d6483f;
+  --danger-soft: #fbe7e5;
+  --warning: #c98a2a;
+  --warning-soft: #fbf0dc;
+  --border: #e4e1d9;
+  --radius: 10px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-ink-dim: var(--sidebar-ink-dim);
+  --color-copper: var(--copper);
+  --color-copper-dark: var(--copper-dark);
+  --color-copper-soft: var(--copper-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-border: var(--border);
+  --radius-app: var(--radius);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+}
