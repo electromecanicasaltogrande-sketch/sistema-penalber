@@ -5,8 +5,22 @@ import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
 import type { VentaRow } from "@/lib/ventas/historial";
 
-export default function CajaView({ initialVentasHoy }: { initialVentasHoy: VentaRow[] }) {
+interface Ajuste {
+  id: string;
+  fecha: string;
+  monto: number;
+  motivo: string;
+}
+
+export default function CajaView({
+  initialVentasHoy,
+  initialAjustes,
+}: {
+  initialVentasHoy: VentaRow[];
+  initialAjustes: Ajuste[];
+}) {
   const [ventas, setVentas] = useState(initialVentasHoy);
+  const [ajustes] = useState(initialAjustes);
 
   useEffect(() => {
     const supabase = createClient();
@@ -39,8 +53,12 @@ export default function CajaView({ initialVentasHoy }: { initialVentasHoy: Venta
       else otros += v.total;
       if (v.doc_type.startsWith("factura")) vendidoFacturado += v.total;
     }
+    for (const a of ajustes) {
+      vendidoEfectivo += a.monto;
+      totalDia += a.monto;
+    }
     return { vendidoEfectivo, vendidoFacturado, otros, totalDia };
-  }, [ventas]);
+  }, [ventas, ajustes]);
 
   const metrics = [
     { label: "Vendido en efectivo", value: vendidoEfectivo },
@@ -77,6 +95,18 @@ export default function CajaView({ initialVentasHoy }: { initialVentasHoy: Venta
             </tr>
           </thead>
           <tbody>
+            {ajustes.map((a) => (
+              <tr key={a.id} className="border-b border-border last:border-none">
+                <td className="px-3 py-2.5">—</td>
+                <td className="px-3 py-2.5 font-mono text-xs">Ajuste</td>
+                <td className="px-3 py-2.5">{a.motivo}</td>
+                <td className="px-3 py-2.5 text-xs">devolución</td>
+                <td className="px-3 py-2.5 font-mono font-semibold">
+                  {a.monto < 0 ? "-" : ""}
+                  {money(Math.abs(a.monto))}
+                </td>
+              </tr>
+            ))}
             {ventas.map((v) => (
               <tr key={v.id} className="border-b border-border last:border-none">
                 <td className="px-3 py-2.5">

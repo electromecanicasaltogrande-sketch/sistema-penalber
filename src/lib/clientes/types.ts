@@ -73,6 +73,9 @@ export function estaPagado(cp: Pick<CtaCteComprobante, "total" | "montoPagado">)
   return saldo(cp) <= 0.5;
 }
 
+// Suma total-montoPagado de todos los comprobantes (los saldados aportan 0,
+// y los ajustes de devolución con total negativo restan deuda real).
 export function deudaCliente(comps: CtaCteComprobante[]): number {
-  return comps.filter((c) => !estaPagado(c)).reduce((s, c) => s + saldo(c), 0);
+  const raw = comps.reduce((s, c) => s + (c.total - c.montoPagado), 0);
+  return Math.max(0, raw);
 }
