@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { buscarArticuloExacto, buscarArticulosPorCodigos } from "@/lib/articulos/search";
-import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
+import { buscarArticulosPorCodigos } from "@/lib/articulos/search";
 import type { Articulo } from "@/lib/articulos/types";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
@@ -12,6 +11,7 @@ import type { Cliente } from "@/lib/clientes/types";
 import { DOC_LABELS, FORMAS_PAGO, type CartItem, type CondicionPago, type DocType } from "@/lib/ventas/types";
 import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
 import ChequeModal, { type ChequeData } from "./ChequeModal";
+import BuscadorArticulos from "@/components/articulos/BuscadorArticulos";
 
 interface VentaHoy {
   id: string;
@@ -35,9 +35,6 @@ export default function VentasView({
   const [clientes] = useState(initialClientes);
 
   const [entryMode, setEntryMode] = useState<"code" | "manual">("code");
-  const [scanTerm, setScanTerm] = useState("");
-  const [pendingTerm, setPendingTerm] = useState<string | null>(null);
-  const scanRef = useRef<HTMLInputElement>(null);
 
   const [manDesc, setManDesc] = useState("");
   const [manQty, setManQty] = useState("1");
@@ -162,8 +159,6 @@ export default function VentasView({
       .slice(0, 6);
   }, [clienteSearch, clientes]);
 
-  const scanSuggestions = useBuscadorArticulos(scanTerm, 5);
-
   function addToCart(articulo: Articulo) {
     setCart((prev) => {
       const existing = prev.find((c) => c.codigo === articulo.codigo);
@@ -185,30 +180,7 @@ export default function VentasView({
         },
       ];
     });
-    setScanTerm("");
     setError("");
-    scanRef.current?.focus();
-  }
-
-  async function addByCode() {
-    const term = scanTerm.trim();
-    if (!term) return;
-    const supabase = createClient();
-    const exacto = await buscarArticuloExacto(supabase, term);
-    if (exacto) return addToCart(exacto);
-    if (scanSuggestions.length === 1) return addToCart(scanSuggestions[0]);
-    if (scanSuggestions.length > 1) {
-      if (pendingTerm === term) {
-        addToCart(scanSuggestions[0]);
-        setPendingTerm(null);
-      } else {
-        setPendingTerm(term);
-        setError("Hay varias coincidencias — apretá Enter de nuevo para agregar la primera");
-      }
-      return;
-    }
-    setError("No se encontró ningún artículo con ese código");
-    setPendingTerm(null);
   }
 
   function addManual() {
@@ -409,38 +381,7 @@ export default function VentasView({
           </div>
 
           {entryMode === "code" ? (
-            <div className="relative">
-              <input
-                ref={scanRef}
-                value={scanTerm}
-                onChange={(e) => setScanTerm(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addByCode()}
-                placeholder="Escaneá o escribí el código / descripción…"
-                className="w-full rounded-lg border-2 border-ink bg-[#101319] px-4 py-3.5 font-mono text-base text-[#7CF29C] outline-none focus:border-copper"
-              />
-              {scanSuggestions.length > 0 && (
-                <div className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-md">
-                  {scanSuggestions.map((a) => (
-                    <button
-                      key={a.id}
-                      onClick={() => addToCart(a)}
-                      className="flex w-full items-center justify-between border-b border-border px-3.5 py-2.5 text-left text-sm last:border-none hover:bg-bg"
-                    >
-                      <div>
-                        <p>{a.descripcion}</p>
-                        <p className="font-mono text-xs text-ink-faint">
-                          {a.codigo} · {a.marca}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono font-semibold">{money(a.precioMinorista)}</p>
-                        <p className="text-xs text-ink-faint">{a.stock} u.</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <BuscadorArticulos onSelect={addToCart} autoFocus />
           ) : (
             <div className="flex gap-2">
               <input

@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
 import type { Articulo } from "@/lib/articulos/types";
 import type { Cliente } from "@/lib/clientes/types";
 import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
+import BuscadorArticulos from "@/components/articulos/BuscadorArticulos";
 
 type Condicion = "efectivo" | "facturado" | "cta_cte";
 
@@ -44,11 +44,9 @@ export default function DevolucionesView({
   const [facturasCliente, setFacturasCliente] = useState<{ numero: string; total: number }[]>([]);
   const [esCambio, setEsCambio] = useState(false);
 
-  const [devTerm, setDevTerm] = useState("");
   const [devArt, setDevArt] = useState<Articulo | null>(null);
   const [devCantidad, setDevCantidad] = useState("1");
 
-  const [nuevoTerm, setNuevoTerm] = useState("");
   const [nuevoArt, setNuevoArt] = useState<Articulo | null>(null);
   const [nuevoCantidad, setNuevoCantidad] = useState("1");
 
@@ -79,9 +77,6 @@ export default function DevolucionesView({
     if (!q) return [];
     return clientes.filter((c) => c.razonSocial.toLowerCase().includes(q)).slice(0, 6);
   }, [clienteSearch, clientes]);
-
-  const devSuggestions = useBuscadorArticulos(devTerm, 5);
-  const nuevoSuggestions = useBuscadorArticulos(nuevoTerm, 5);
 
   const montoDevuelto = devArt ? devArt.precioMinorista * (Number(devCantidad) || 0) : 0;
   const montoNuevo = esCambio && nuevoArt ? nuevoArt.precioMinorista * (Number(nuevoCantidad) || 0) : 0;
@@ -198,10 +193,8 @@ export default function DevolucionesView({
 
       setOk("Devolución registrada correctamente.");
       setDevArt(null);
-      setDevTerm("");
       setDevCantidad("1");
       setNuevoArt(null);
-      setNuevoTerm("");
       setNuevoCantidad("1");
       setEsCambio(false);
     } catch {
@@ -304,96 +297,56 @@ export default function DevolucionesView({
 
         <div className="mb-3 rounded-lg border border-border p-3">
           <p className="mb-1.5 text-xs font-semibold text-ink-soft">Artículo devuelto</p>
-          <div className="relative">
-            <input
-              value={devTerm}
-              onChange={(e) => {
-                setDevTerm(e.target.value);
-                setDevArt(null);
-              }}
-              placeholder="Código o descripción…"
-              className={FIELD}
-            />
-            {devSuggestions.length > 0 && !devArt && (
-              <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-surface shadow-md">
-                {devSuggestions.map((a) => (
-                  <button
-                    key={a.id}
-                    onClick={() => {
-                      setDevArt(a);
-                      setDevTerm(`${a.codigo} — ${a.descripcion}`);
-                    }}
-                    className="block w-full border-b border-border px-3 py-2 text-left text-sm last:border-none hover:bg-bg"
-                  >
-                    {a.descripcion} <span className="text-xs text-ink-faint">stock: {a.stock}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {devArt && (
-            <div className="mt-2 flex items-center justify-between text-xs text-ink-faint">
+          {devArt ? (
+            <div className="flex items-center justify-between text-xs text-ink-faint">
               <span>
-                {devArt.marca} · {money(devArt.precioMinorista)} c/u · stock actual {devArt.stock}
+                <b className="text-ink">{devArt.descripcion}</b> · {devArt.marca} · {money(devArt.precioMinorista)} c/u · stock actual {devArt.stock}
               </span>
-              <label className="flex items-center gap-1.5 text-ink-soft">
-                Cant.
-                <input
-                  type="number"
-                  value={devCantidad}
-                  onChange={(e) => setDevCantidad(e.target.value)}
-                  className="w-16 rounded border border-border px-1.5 py-1 text-right font-mono"
-                />
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-ink-soft">
+                  Cant.
+                  <input
+                    type="number"
+                    value={devCantidad}
+                    onChange={(e) => setDevCantidad(e.target.value)}
+                    className="w-16 rounded border border-border px-1.5 py-1 text-right font-mono"
+                  />
+                </label>
+                <button onClick={() => setDevArt(null)} className="font-medium text-danger">
+                  Quitar
+                </button>
+              </div>
             </div>
+          ) : (
+            <BuscadorArticulos onSelect={setDevArt} />
           )}
         </div>
 
         {esCambio && (
           <div className="mb-3 rounded-lg border border-border p-3">
             <p className="mb-1.5 text-xs font-semibold text-ink-soft">Artículo nuevo (que se lleva)</p>
-            <div className="relative">
-              <input
-                value={nuevoTerm}
-                onChange={(e) => {
-                  setNuevoTerm(e.target.value);
-                  setNuevoArt(null);
-                }}
-                placeholder="Código o descripción…"
-                className={FIELD}
-              />
-              {nuevoSuggestions.length > 0 && !nuevoArt && (
-                <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-surface shadow-md">
-                  {nuevoSuggestions.map((a) => (
-                    <button
-                      key={a.id}
-                      onClick={() => {
-                        setNuevoArt(a);
-                        setNuevoTerm(`${a.codigo} — ${a.descripcion}`);
-                      }}
-                      className="block w-full border-b border-border px-3 py-2 text-left text-sm last:border-none hover:bg-bg"
-                    >
-                      {a.descripcion} <span className="text-xs text-ink-faint">stock: {a.stock}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {nuevoArt && (
-              <div className="mt-2 flex items-center justify-between text-xs text-ink-faint">
+            {nuevoArt ? (
+              <div className="flex items-center justify-between text-xs text-ink-faint">
                 <span>
-                  {nuevoArt.marca} · {money(nuevoArt.precioMinorista)} c/u
+                  <b className="text-ink">{nuevoArt.descripcion}</b> · {nuevoArt.marca} · {money(nuevoArt.precioMinorista)} c/u
                 </span>
-                <label className="flex items-center gap-1.5 text-ink-soft">
-                  Cant.
-                  <input
-                    type="number"
-                    value={nuevoCantidad}
-                    onChange={(e) => setNuevoCantidad(e.target.value)}
-                    className="w-16 rounded border border-border px-1.5 py-1 text-right font-mono"
-                  />
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-ink-soft">
+                    Cant.
+                    <input
+                      type="number"
+                      value={nuevoCantidad}
+                      onChange={(e) => setNuevoCantidad(e.target.value)}
+                      className="w-16 rounded border border-border px-1.5 py-1 text-right font-mono"
+                    />
+                  </label>
+                  <button onClick={() => setNuevoArt(null)} className="font-medium text-danger">
+                    Quitar
+                  </button>
+                </div>
               </div>
+            ) : (
+              <BuscadorArticulos onSelect={setNuevoArt} />
             )}
           </div>
         )}

@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { buscarArticulosPorCodigos } from "@/lib/articulos/search";
-import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
 import {
@@ -13,6 +12,7 @@ import {
   type FacturaCompraRow,
   type Proveedor,
 } from "@/lib/proveedores/types";
+import BuscadorArticulos from "@/components/articulos/BuscadorArticulos";
 
 const FIELD =
   "w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
@@ -447,10 +447,7 @@ function NuevoProveedorModal({
 
 function RecepcionModal({ facturaId, onClose }: { facturaId: string; onClose: () => void }) {
   const [items, setItems] = useState<{ codigo: string; cantidad: number }[]>([]);
-  const [term, setTerm] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const suggestions = useBuscadorArticulos(term, 5);
 
   function addItem(codigo: string) {
     setItems((prev) => {
@@ -458,7 +455,6 @@ function RecepcionModal({ facturaId, onClose }: { facturaId: string; onClose: ()
       if (existing) return prev.map((i) => (i.codigo === codigo ? { ...i, cantidad: i.cantidad + 1 } : i));
       return [...prev, { codigo, cantidad: 1 }];
     });
-    setTerm("");
   }
 
   async function finalizar() {
@@ -484,26 +480,8 @@ function RecepcionModal({ facturaId, onClose }: { facturaId: string; onClose: ()
         </h2>
         <p className="mt-1 text-xs text-ink-faint">Es opcional — podés omitirlo y cargarlo después.</p>
 
-        <div className="relative mt-3">
-          <input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder="Buscar artículo por código o descripción…"
-            className={FIELD}
-          />
-          {suggestions.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-surface shadow-md">
-              {suggestions.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => addItem(a.codigo)}
-                  className="block w-full border-b border-border px-3 py-2 text-left text-sm last:border-none hover:bg-bg"
-                >
-                  {a.codigo} — {a.descripcion}
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="mt-3">
+          <BuscadorArticulos onSelect={(a) => addItem(a.codigo)} mostrarPrecio="ninguno" mostrarStock={false} />
         </div>
 
         <div className="mt-3 flex flex-col gap-1.5">

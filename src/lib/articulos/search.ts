@@ -34,17 +34,52 @@ function aplicarBusquedaTexto<T extends { or: (f: string) => T }>(query: T, text
   return query;
 }
 
-export async function buscarArticulos(
-  supabase: SupabaseClient<Database>,
+// Igual que aplicarBusquedaTexto pero restringido a una sola columna: cada
+// palabra tiene que aparecer en ESE campo (encadenar .ilike() en la misma
+// columna también se combina con AND).
+function aplicarPalabrasEnCampo<T extends { ilike: (c: string, p: string) => T }>(
+  query: T,
+  campo: string,
   texto: string,
-  limite = 8,
+): T {
+  const palabras = texto.trim().split(/\s+/).filter(Boolean).slice(0, MAX_PALABRAS_BUSQUEDA);
+  for (const palabra of palabras) {
+    query = query.ilike(campo, `%${escaparPatronIlike(palabra)}%`);
+  }
+  return query;
+}
+
+export interface FiltrosBusquedaArticulo {
+  codigo?: string;
+  descripcion?: string;
+  rubros?: string[];
+  marcas?: string[];
+}
+
+// Búsqueda "avanzada" con código y descripción por separado (para no
+// mezclar resultados cuando el código buscado también aparece como
+// substring de otras descripciones) más filtros de rubro/marca — usada por
+// el buscador de artículos de Ventas, Presupuestos, Reparaciones, etc.
+export async function buscarArticulosAvanzado(
+  supabase: SupabaseClient<Database>,
+  filtros: FiltrosBusquedaArticulo,
+  limite = 20,
 ): Promise<Articulo[]> {
-  const q = texto.trim();
-  if (q.length < 2) return [];
-  const query = aplicarBusquedaTexto(
-    supabase.from("articulos").select(COLUMNAS_ARTICULO),
-    q,
-  ).order("codigo").limit(limite);
+  const codigo = filtros.codigo?.trim() ?? "";
+  const descripcion = filtros.descripcion?.trim() ?? "";
+  const rubros = filtros.rubros ?? [];
+  const marcas = filtros.marcas ?? [];
+
+  if (codigo.length < 1 && descripcion.length < 2 && rubros.length === 0 && marcas.length === 0) {
+    return [];
+  }
+
+  let query = supabase.from("articulos").select(COLUMNAS_ARTICULO).order("codigo").limit(limite);
+  if (codigo) query = aplicarPalabrasEnCampo(query, "codigo", codigo);
+  if (descripcion.length >= 2) query = aplicarPalabrasEnCampo(query, "descripcion", descripcion);
+  if (rubros.length > 0) query = query.in("rubro", rubros);
+  if (marcas.length > 0) query = query.in("marca", marcas);
+
   const { data } = await query;
   return ((data as unknown as ArticuloRow[]) ?? []).map(fromRow);
 }

@@ -2,13 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buscarArticuloExacto } from "@/lib/articulos/search";
-import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
 import { money } from "@/lib/format";
 import type { Articulo } from "@/lib/articulos/types";
 import type { Cliente } from "@/lib/clientes/types";
 import type { CartItem } from "@/lib/ventas/types";
 import { presupuestoTallerFromRow, type PresupuestoTaller, type PresupuestoTallerRow } from "@/lib/taller/types";
+import BuscadorArticulos from "@/components/articulos/BuscadorArticulos";
 
 const FIELD_BASE =
   "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
@@ -28,7 +27,6 @@ export default function PresupuestosTallerView({
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [showSuggest, setShowSuggest] = useState(false);
   const [entryMode, setEntryMode] = useState<"code" | "manual">("code");
-  const [scanTerm, setScanTerm] = useState("");
   const [manDesc, setManDesc] = useState("");
   const [manQty, setManQty] = useState("1");
   const [manPrice, setManPrice] = useState("");
@@ -45,24 +43,12 @@ export default function PresupuestosTallerView({
     return clientes.filter((c) => c.razonSocial.toLowerCase().includes(q)).slice(0, 5);
   }, [clienteNombre, clientes]);
 
-  const scanSuggestions = useBuscadorArticulos(scanTerm, 5);
-
   function addToCart(a: Articulo) {
     setCart((prev) => {
       const existing = prev.find((c) => c.codigo === a.codigo);
       if (existing) return prev.map((c) => (c.codigo === a.codigo ? { ...c, cantidad: c.cantidad + 1 } : c));
       return [...prev, { codigo: a.codigo, descripcion: a.descripcion, marca: a.marca, precio: a.precioMinorista, cantidad: 1, iva: a.iva }];
     });
-    setScanTerm("");
-  }
-  async function addByCode() {
-    const term = scanTerm.trim();
-    if (!term) return;
-    const supabase = createClient();
-    const exacto = await buscarArticuloExacto(supabase, term);
-    if (exacto) return addToCart(exacto);
-    if (scanSuggestions.length >= 1) return addToCart(scanSuggestions[0]);
-    setError("No se encontró ningún artículo con ese código.");
   }
   function addManual() {
     const price = parseFloat(manPrice) || 0;
@@ -228,25 +214,7 @@ export default function PresupuestosTallerView({
             ))}
           </div>
           {entryMode === "code" ? (
-            <div className="relative">
-              <input
-                value={scanTerm}
-                onChange={(e) => setScanTerm(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addByCode()}
-                placeholder="Código o descripción…"
-                className={FIELD}
-              />
-              {scanSuggestions.length > 0 && (
-                <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-surface shadow-md">
-                  {scanSuggestions.map((a) => (
-                    <button key={a.id} onClick={() => addToCart(a)} className="flex w-full items-center justify-between border-b border-border px-3 py-2 text-left text-sm last:border-none hover:bg-bg">
-                      <span>{a.descripcion}</span>
-                      <span className="font-mono text-xs">{money(a.precioMinorista)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <BuscadorArticulos onSelect={addToCart} />
           ) : (
             <div className="flex gap-2">
               <input value={manDesc} onChange={(e) => setManDesc(e.target.value)} placeholder="Descripción" className={`${FIELD_BASE} flex-1`} />
