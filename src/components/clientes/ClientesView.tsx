@@ -44,7 +44,7 @@ export default function ClientesView({ initialClientes }: { initialClientes: Cli
   const selected = clientes.find((c) => c.id === selectedId) ?? null;
 
   return (
-    <div className="grid grid-cols-[320px_1fr] gap-5">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
       <div>
         <div className="mb-3 flex gap-2">
           <input

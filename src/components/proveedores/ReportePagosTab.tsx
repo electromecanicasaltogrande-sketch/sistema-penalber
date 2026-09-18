@@ -116,7 +116,7 @@ export default function ReportePagosTab({
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3.5">
+      <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
         <div className="rounded-[var(--radius-app)] border border-border bg-warning-soft p-4">
           <p className="text-[11px] font-semibold uppercase text-warning">Pendiente</p>
           <p className="mt-1 text-xs text-ink-soft">Neto {money(totPend.neto)} · IVA {money(totPend.iva)}</p>

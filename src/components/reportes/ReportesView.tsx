@@ -103,7 +103,7 @@ export default function ReportesView({
         <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className={FIELD} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Seccion titulo="Ventas">
           <Fila label="Cobrado en efectivo" value={ventasReporte.efectivo} />
           <Fila label="Vendido facturado" value={ventasReporte.facturado} />

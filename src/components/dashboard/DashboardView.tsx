@@ -53,14 +53,14 @@ export default function DashboardView({
 
   return (
     <div>
-      <div className="mb-5 grid grid-cols-4 gap-3.5">
+      <div className="mb-5 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <Metric label="Ventas totales de hoy" value={money(totalHoy)} />
         <Metric label="Vendido en efectivo" value={money(efectivoHoy)} />
         <Metric label="Vendido facturado" value={money(facturadoHoy)} />
         <Metric label="Artículos con stock bajo" value={String(stockBajo.length)} danger={stockBajo.length > 0} />
       </div>
 
-      <div className="mb-5 grid grid-cols-[1.4fr_1fr] gap-4">
+      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="rounded-[var(--radius-app)] border border-border bg-surface p-4">
           <p className="mb-1 text-sm font-semibold text-ink">Ventas de los últimos 7 días</p>
           <p className="mb-3 text-xs text-ink-faint">Efectivo vs. facturado</p>

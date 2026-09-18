@@ -122,7 +122,7 @@ export default function FacturasCompraTab({
   const proveedorSeleccionado = proveedores.find((p) => p.id === proveedorId);
 
   return (
-    <div className="grid grid-cols-[1fr_380px] gap-5">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_380px]">
       <div>
         <input
           value={busqueda}

@@ -31,6 +31,37 @@ const CAMPOS = [
   { id: "iva", label: "IVA" },
 ] as const;
 
+function normalizarClave(k: string): string {
+  return k
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+}
+
+const ALIAS: Record<string, string[]> = {
+  CODIGO: ["CODIGO"],
+  DESCRIPCION: ["DESCRIPCION"],
+  "COSTO CON DESCUENTO": ["COSTO CON DESCUENTO", "COSTO C/DESCUENTO", "COSTO CON DTO"],
+  COSTO: ["COSTO"],
+  MARCA: ["MARCA"],
+  MODELO: ["MODELO"],
+  MEDIDA: ["MEDIDA"],
+  RUBRO: ["RUBRO"],
+  "PRECIO VENTA": ["PRECIO VENTA", "PRECIO DE VENTA", "P VENTA", "P. VENTA"],
+  IVA: ["IVA"],
+};
+
+function buscarValor(fila: Record<string, unknown>, campo: keyof typeof ALIAS): unknown {
+  const normalizados: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fila)) normalizados[normalizarClave(k)] = v;
+  for (const alias of ALIAS[campo]) {
+    if (alias in normalizados) return normalizados[alias];
+  }
+  return undefined;
+}
+
 export default function ImportarExcelTab({
   articulos,
   onImportado,
@@ -38,46 +69,85 @@ export default function ImportarExcelTab({
   articulos: Articulo[];
   onImportado: () => void;
 }) {
+  const [archivo, setArchivo] = useState<File | null>(null);
   const [filas, setFilas] = useState<FilaImport[]>([]);
+  const [columnasDetectadas, setColumnasDetectadas] = useState<string[]>([]);
   const [campos, setCampos] = useState<Set<string>>(new Set(CAMPOS.map((c) => c.id)));
+  const [leyendo, setLeyendo] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resultado, setResultado] = useState<{ nuevos: number; actualizados: number } | null>(null);
   const [error, setError] = useState("");
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    setArchivo(file ?? null);
     setError("");
     setResultado(null);
+    setFilas([]);
+    setColumnasDetectadas([]);
+  }
+
+  function cargarLista() {
+    if (!archivo) {
+      setError("Elegí primero un archivo .xlsx.");
+      return;
+    }
+    setError("");
+    setLeyendo(true);
     const reader = new FileReader();
+    reader.onerror = () => {
+      setLeyendo(false);
+      setError("No se pudo leer el archivo.");
+    };
     reader.onload = (ev) => {
       try {
-        const wb = XLSX.read(ev.target?.result, { type: "binary" });
+        const data = ev.target?.result;
+        const wb = XLSX.read(data, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        if (rows.length === 0) {
+          setLeyendo(false);
+          setError("El archivo no tiene filas de datos.");
+          return;
+        }
+
+        setColumnasDetectadas(Object.keys(rows[0]));
+
         const codigosExistentes = new Set(articulos.map((a) => a.codigo.toLowerCase()));
-        const parsed: FilaImport[] = rows.map((r) => {
-          const codigo = String(r["CODIGO"] ?? "").trim();
-          return {
-            codigo,
-            descripcion: String(r["DESCRIPCION"] ?? "").trim(),
-            costoConDescuento: Number(r["COSTO CON DESCUENTO"]) || 0,
-            costo: Number(r["COSTO"]) || 0,
-            marca: String(r["MARCA"] ?? "").trim(),
-            modelo: String(r["MODELO"] ?? "").trim(),
-            medida: String(r["MEDIDA"] ?? "").trim(),
-            rubro: String(r["RUBRO"] ?? "").trim(),
-            precioVenta: Number(r["PRECIO VENTA"]) || 0,
-            iva: Number(r["IVA"]) || 21,
-            existe: codigosExistentes.has(codigo.toLowerCase()),
-          };
-        }).filter((f) => f.codigo);
+        const parsed: FilaImport[] = rows
+          .map((r) => {
+            const codigo = String(buscarValor(r, "CODIGO") ?? "").trim();
+            return {
+              codigo,
+              descripcion: String(buscarValor(r, "DESCRIPCION") ?? "").trim(),
+              costoConDescuento: Number(buscarValor(r, "COSTO CON DESCUENTO")) || 0,
+              costo: Number(buscarValor(r, "COSTO")) || 0,
+              marca: String(buscarValor(r, "MARCA") ?? "").trim(),
+              modelo: String(buscarValor(r, "MODELO") ?? "").trim(),
+              medida: String(buscarValor(r, "MEDIDA") ?? "").trim(),
+              rubro: String(buscarValor(r, "RUBRO") ?? "").trim(),
+              precioVenta: Number(buscarValor(r, "PRECIO VENTA")) || 0,
+              iva: Number(buscarValor(r, "IVA")) || 21,
+              existe: codigosExistentes.has(codigo.toLowerCase()),
+            };
+          })
+          .filter((f) => f.codigo);
+
+        setLeyendo(false);
+        if (parsed.length === 0) {
+          setError(
+            "Se leyó el archivo pero ninguna fila tiene código. Revisá que la primera fila sea el encabezado y que exista la columna CODIGO.",
+          );
+          return;
+        }
         setFilas(parsed);
       } catch {
-        setError("No se pudo leer el archivo. Verificá que sea un .xlsx válido con las columnas esperadas.");
+        setLeyendo(false);
+        setError("No se pudo leer el archivo. Verificá que sea un .xlsx válido.");
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(archivo);
   }
 
   function toggleCampo(id: string) {
@@ -126,6 +196,7 @@ export default function ImportarExcelTab({
     setImporting(false);
     setResultado({ nuevos, actualizados });
     setFilas([]);
+    setArchivo(null);
     onImportado();
   }
 
@@ -133,11 +204,30 @@ export default function ImportarExcelTab({
     <div>
       <div className="mb-4 rounded-[var(--radius-app)] border border-border bg-surface p-4">
         <p className="mb-2 text-sm text-ink-soft">
-          Columnas esperadas, en este orden: <b>CODIGO, DESCRIPCION, COSTO CON DESCUENTO, COSTO, MARCA,
+          Columnas esperadas (en cualquier orden): <b>CODIGO, DESCRIPCION, COSTO CON DESCUENTO, COSTO, MARCA,
           MODELO, MEDIDA, RUBRO, PRECIO VENTA, IVA</b>.
         </p>
-        <input type="file" accept=".xlsx,.xls" onChange={onFile} className="text-sm" />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={onFile}
+            className="text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-bg file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink-soft"
+          />
+          <button
+            onClick={cargarLista}
+            disabled={!archivo || leyendo}
+            className="rounded-lg bg-copper px-4 py-2 text-sm font-semibold text-white hover:bg-copper-dark disabled:opacity-40"
+          >
+            {leyendo ? "Leyendo…" : "Cargar lista"}
+          </button>
+        </div>
         {error && <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-xs font-medium text-danger">{error}</p>}
+        {columnasDetectadas.length > 0 && filas.length === 0 && (
+          <p className="mt-2 text-xs text-ink-faint">
+            Columnas detectadas en el archivo: {columnasDetectadas.join(", ")}
+          </p>
+        )}
         {resultado && (
           <p className="mt-2 rounded-lg bg-success-soft px-3 py-2 text-xs font-medium text-success">
             Importación completa: {resultado.nuevos} nuevos, {resultado.actualizados} actualizados.

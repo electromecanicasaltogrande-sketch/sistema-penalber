@@ -263,7 +263,7 @@ export default function PresupuestosView({
           </div>
 
           {subTab === "datos" && (
-            <div className="grid grid-cols-[1.4fr_1fr] gap-5">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
               <div>
                 <div className="mb-3 grid grid-cols-2 gap-2.5">
                   <div className="relative">

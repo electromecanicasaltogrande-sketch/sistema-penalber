@@ -7,6 +7,7 @@ import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
 import type { Articulo } from "@/lib/articulos/types";
 import type { Cliente } from "@/lib/clientes/types";
+import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
 
 type Condicion = "efectivo" | "facturado" | "cta_cte";
 
@@ -58,6 +59,7 @@ export default function DevolucionesView({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
+  const [printDoc, setPrintDoc] = useState<ComprobanteDocData | null>(null);
 
   useEffect(() => {
     if (condicion !== "facturado" || !selectedCliente) {
@@ -132,6 +134,7 @@ export default function DevolucionesView({
         const { data: n } = await supabase.rpc("next_comprobante_numero");
         const numero = `NC B ${empresa.puntoVenta}-${String(n).padStart(8, "0")}`;
         const cae = "7" + Math.floor(1000000000000 + Math.random() * 8999999999999).toString();
+        const fechaHoy = new Date().toLocaleDateString("es-AR");
         await supabase.from("ventas").insert({
           numero,
           tipo: "Nota de Crédito B",
@@ -146,6 +149,29 @@ export default function DevolucionesView({
           discrimina_iva: false,
           cae,
           nc_referencia_numero: facturaNumero,
+        });
+        setPrintDoc({
+          docType: "nc_b",
+          numero,
+          empresa,
+          clienteNombre,
+          condicionPagoLabel: `Nota de crédito — ref. ${facturaNumero}`,
+          items: [
+            {
+              codigo: devArt.codigo,
+              descripcion: devArt.descripcion,
+              marca: devArt.marca,
+              cantidad: Number(devCantidad) || 0,
+              precio: devArt.precioMinorista,
+              iva: devArt.iva,
+            },
+          ],
+          subtotal: montoDevuelto,
+          descuento: 0,
+          total: montoDevuelto,
+          cae,
+          caeVencimiento: fechaHoy,
+          fecha: fechaHoy,
         });
       } else if (condicion === "cta_cte" && selectedCliente) {
         await supabase.from("cta_cte_comprobantes").insert({
@@ -208,7 +234,7 @@ export default function DevolucionesView({
   );
 
   return (
-    <div className="grid grid-cols-[1.3fr_1fr] gap-5">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
       <div className="rounded-[var(--radius-app)] border border-border bg-surface p-4">
         <div className="mb-3 relative">
           <label className={LABEL}>Cliente</label>
@@ -443,6 +469,8 @@ export default function DevolucionesView({
           {historialFiltrado.length === 0 && <p className="text-sm text-ink-faint">Sin devoluciones cargadas.</p>}
         </div>
       </div>
+
+      {printDoc && <ComprobantePrint doc={printDoc} onClose={() => setPrintDoc(null)} />}
     </div>
   );
 }

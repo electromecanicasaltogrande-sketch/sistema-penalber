@@ -414,7 +414,7 @@ export default function VentasView({
   }
 
   return (
-    <div className="grid grid-cols-[1.5fr_1fr] gap-5">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
       <div>
         <div className="mb-4 rounded-[var(--radius-app)] border border-border bg-surface p-4">
           <div className="mb-3 flex gap-1 border-b border-border">

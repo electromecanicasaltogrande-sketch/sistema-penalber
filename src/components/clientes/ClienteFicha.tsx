@@ -16,6 +16,7 @@ import {
 import { distribuirPago } from "@/lib/clientes/payment";
 import { DOC_LABELS } from "@/lib/ventas/types";
 import ReciboPago, { type ReciboData } from "./ReciboPago";
+import DetalleCuentaPrint, { type DetalleCuentaData } from "./DetalleCuentaPrint";
 
 type Tab = "deuda" | "pago" | "datos";
 
@@ -44,6 +45,8 @@ export default function ClienteFicha({
   const [descuento10, setDescuento10] = useState(false);
   const [montoPago, setMontoPago] = useState("");
   const [recibo, setRecibo] = useState<ReciboData | null>(null);
+  const [seleccionDetalle, setSeleccionDetalle] = useState<Set<string>>(new Set());
+  const [detalleCuenta, setDetalleCuenta] = useState<DetalleCuentaData | null>(null);
   const [error, setError] = useState("");
 
   // Datos tab
@@ -63,6 +66,7 @@ export default function ClienteFicha({
     setLocalidad(cliente.localidad);
     setTipoComprobanteDefault(cliente.tipoComprobanteDefault ?? "");
     setSeleccionadas([]);
+    setSeleccionDetalle(new Set());
     setTab("deuda");
   }, [cliente.id]);
 
@@ -374,41 +378,85 @@ export default function ClienteFicha({
           ) : filtrados.length === 0 ? (
             <p className="py-6 text-center text-sm text-ink-faint">Sin comprobantes para este filtro.</p>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              {filtrados.map((cp) => {
-                const s = saldo(cp);
-                const pagado = estaPagado(cp);
-                const parcial = !pagado && cp.montoPagado > 0;
-                return (
-                  <div
-                    key={cp.id}
-                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium text-ink">
-                        {cp.tipo} — {cp.numero}
-                      </p>
-                      <p className="text-xs text-ink-faint">
-                        {cp.fecha} · {empresaCorta(cp.empresaCuit)}
-                        {parcial ? ` · abonado ${money(cp.montoPagado)}` : ""}
-                      </p>
+            <>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-xs text-ink-soft">
+                  <input
+                    type="checkbox"
+                    checked={filtrados.length > 0 && filtrados.every((cp) => seleccionDetalle.has(cp.id))}
+                    onChange={(e) =>
+                      setSeleccionDetalle(e.target.checked ? new Set(filtrados.map((cp) => cp.id)) : new Set())
+                    }
+                  />
+                  Seleccionar todos
+                </label>
+                <button
+                  onClick={() =>
+                    setDetalleCuenta({
+                      clienteNombre: cliente.razonSocial,
+                      clienteCuit: cliente.cuit,
+                      comprobantes:
+                        seleccionDetalle.size > 0
+                          ? filtrados.filter((cp) => seleccionDetalle.has(cp.id))
+                          : filtrados,
+                      fecha: new Date().toLocaleDateString("es-AR"),
+                    })
+                  }
+                  className="rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                >
+                  📄 Generar detalle de cuenta{seleccionDetalle.size > 0 ? ` (${seleccionDetalle.size})` : ""}
+                </button>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {filtrados.map((cp) => {
+                  const s = saldo(cp);
+                  const pagado = estaPagado(cp);
+                  const parcial = !pagado && cp.montoPagado > 0;
+                  return (
+                    <div
+                      key={cp.id}
+                      className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={seleccionDetalle.has(cp.id)}
+                          onChange={(e) =>
+                            setSeleccionDetalle((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(cp.id);
+                              else next.delete(cp.id);
+                              return next;
+                            })
+                          }
+                        />
+                        <div>
+                          <p className="font-medium text-ink">
+                            {cp.tipo} — {cp.numero}
+                          </p>
+                          <p className="text-xs text-ink-faint">
+                            {cp.fecha} · {empresaCorta(cp.empresaCuit)}
+                            {parcial ? ` · abonado ${money(cp.montoPagado)}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono font-semibold">
+                          {pagado ? money(cp.total) : `${money(s)} de ${money(cp.total)}`}
+                        </p>
+                        <span
+                          className={`text-[11px] font-semibold ${
+                            pagado ? "text-success" : parcial ? "text-warning" : "text-danger"
+                          }`}
+                        >
+                          {pagado ? "Pagado" : parcial ? "Parcial" : "Pendiente"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono font-semibold">
-                        {pagado ? money(cp.total) : `${money(s)} de ${money(cp.total)}`}
-                      </p>
-                      <span
-                        className={`text-[11px] font-semibold ${
-                          pagado ? "text-success" : parcial ? "text-warning" : "text-danger"
-                        }`}
-                      >
-                        {pagado ? "Pagado" : parcial ? "Parcial" : "Pendiente"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -577,6 +625,7 @@ export default function ClienteFicha({
       </div>
 
       {recibo && <ReciboPago recibo={recibo} onClose={() => setRecibo(null)} />}
+      {detalleCuenta && <DetalleCuentaPrint doc={detalleCuenta} onClose={() => setDetalleCuenta(null)} />}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
 import { empresaCorta } from "@/lib/empresas";
-import { buildComprobanteDoc, type VentaRow } from "@/lib/ventas/historial";
+import { buildComprobanteDoc, eliminarVenta, type VentaRow } from "@/lib/ventas/historial";
 import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
 
 type TipoFiltro = "" | "factura" | "remito" | "nc";
@@ -12,13 +12,20 @@ type TipoFiltro = "" | "factura" | "remito" | "nc";
 const FIELD =
   "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
 
-export default function HistorialView({ initialVentas }: { initialVentas: VentaRow[] }) {
+export default function HistorialView({
+  initialVentas,
+  isAdmin,
+}: {
+  initialVentas: VentaRow[];
+  isAdmin: boolean;
+}) {
   const [ventas, setVentas] = useState(initialVentas);
   const [cliente, setCliente] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [tipo, setTipo] = useState<TipoFiltro>("");
   const [printDoc, setPrintDoc] = useState<ComprobanteDocData | null>(null);
+  const [borrando, setBorrando] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -26,6 +33,10 @@ export default function HistorialView({ initialVentas }: { initialVentas: VentaR
       .channel("ventas-historial-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, (payload) => {
         setVentas((prev) => [payload.new as VentaRow, ...prev]);
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "ventas" }, (payload) => {
+        const id = (payload.old as { id: string }).id;
+        setVentas((prev) => prev.filter((v) => v.id !== id));
       })
       .subscribe();
     return () => {
@@ -48,6 +59,20 @@ export default function HistorialView({ initialVentas }: { initialVentas: VentaR
 
   async function verImprimir(v: VentaRow) {
     setPrintDoc(await buildComprobanteDoc(v));
+  }
+
+  async function borrar(v: VentaRow) {
+    const ok = window.confirm(
+      `¿Eliminar ${v.numero} (${v.cliente_nombre}, ${money(v.total)})? Esto devuelve el stock y saca el monto de Caja, Dashboard y Reportes. No se puede deshacer.`,
+    );
+    if (!ok) return;
+    setBorrando(v.id);
+    try {
+      await eliminarVenta(v);
+      setVentas((prev) => prev.filter((x) => x.id !== v.id));
+    } finally {
+      setBorrando(null);
+    }
   }
 
   return (
@@ -93,12 +118,23 @@ export default function HistorialView({ initialVentas }: { initialVentas: VentaR
                 <td className="px-3 py-2.5 text-xs capitalize">{v.condicion_pago.replace("_", " ")}</td>
                 <td className="px-3 py-2.5 font-mono font-semibold">{money(v.total)}</td>
                 <td className="px-3 py-2.5">
-                  <button
-                    onClick={() => verImprimir(v)}
-                    className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft hover:bg-bg"
-                  >
-                    Ver / Reimprimir
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => verImprimir(v)}
+                      className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft hover:bg-bg"
+                    >
+                      Ver / Reimprimir
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => borrar(v)}
+                        disabled={borrando === v.id}
+                        className="rounded-full border border-danger/30 px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger-soft disabled:opacity-50"
+                      >
+                        {borrando === v.id ? "Eliminando…" : "Eliminar"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

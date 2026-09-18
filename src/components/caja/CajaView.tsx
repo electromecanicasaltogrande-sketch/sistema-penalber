@@ -69,7 +69,7 @@ export default function CajaView({
 
   return (
     <div>
-      <div className="mb-4 grid grid-cols-4 gap-3.5">
+      <div className="mb-4 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         {metrics.map((m) => (
           <div key={m.label} className="rounded-[var(--radius-app)] border border-border bg-surface p-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">{m.label}</p>
