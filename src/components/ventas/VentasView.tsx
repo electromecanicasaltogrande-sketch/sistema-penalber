@@ -173,17 +173,9 @@ export default function VentasView({
   }, [scanTerm, articulos]);
 
   function addToCart(articulo: Articulo) {
-    if (articulo.stock <= 0) {
-      setError(`Sin stock disponible de ${articulo.descripcion}`);
-      return;
-    }
     setCart((prev) => {
       const existing = prev.find((c) => c.codigo === articulo.codigo);
       if (existing) {
-        if (existing.cantidad >= articulo.stock) {
-          setError("No hay más stock disponible");
-          return prev;
-        }
         return prev.map((c) =>
           c.codigo === articulo.codigo ? { ...c, cantidad: c.cantidad + 1 } : c,
         );
@@ -251,7 +243,6 @@ export default function VentasView({
         if (i !== idx) return c;
         let n = val;
         if (n < 1) n = 1;
-        if (c.stockDisponible !== undefined && n > c.stockDisponible) n = c.stockDisponible;
         return { ...c, cantidad: n };
       }),
     );
@@ -347,7 +338,7 @@ export default function VentasView({
         setArticulos((prev) =>
           prev.map((a) => {
             const line = cart.find((c) => c.codigo === a.codigo);
-            return line ? { ...a, stock: a.stock - line.cantidad } : a;
+            return line ? { ...a, stock: Math.max(0, a.stock - line.cantidad) } : a;
           }),
         );
       }

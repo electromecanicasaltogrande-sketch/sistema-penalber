@@ -14,7 +14,7 @@ export interface FilaImportJob {
   existe: boolean;
 }
 
-interface ImportJobState {
+export interface ImportJobState {
   id: number;
   archivo: string;
   hoja: string;
@@ -27,8 +27,9 @@ interface ImportJobState {
 }
 
 interface ImportJobContextValue {
-  job: ImportJobState | null;
+  jobs: ImportJobState[];
   iniciar: (archivoNombre: string, hoja: string, filas: FilaImportJob[], campos: Set<string>) => void;
+  cerrar: (id: number) => void;
 }
 
 const ImportJobContext = createContext<ImportJobContextValue | null>(null);
@@ -38,26 +39,32 @@ const ImportJobContext = createContext<ImportJobContextValue | null>(null);
 const CADA_N_FILAS = 10;
 
 export function ImportJobProvider({ children }: { children: React.ReactNode }) {
-  const [job, setJob] = useState<ImportJobState | null>(null);
-  const runningRef = useRef(false);
+  const [jobs, setJobs] = useState<ImportJobState[]>([]);
   const idRef = useRef(0);
 
+  const actualizarJob = useCallback((id: number, patch: Partial<ImportJobState>) => {
+    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+  }, []);
+
+  // Varias listas pueden importarse a la vez: cada llamada a iniciar() corre
+  // su propio loop independiente, identificado por su propio id.
   const iniciar = useCallback(
     (archivoNombre: string, hoja: string, filas: FilaImportJob[], campos: Set<string>) => {
-      if (runningRef.current) return;
-      runningRef.current = true;
       const id = ++idRef.current;
-      setJob({
-        id,
-        archivo: archivoNombre,
-        hoja,
-        activo: true,
-        total: filas.length,
-        hecho: 0,
-        nuevos: 0,
-        actualizados: 0,
-        errores: 0,
-      });
+      setJobs((prev) => [
+        ...prev,
+        {
+          id,
+          archivo: archivoNombre,
+          hoja,
+          activo: true,
+          total: filas.length,
+          hecho: 0,
+          nuevos: 0,
+          actualizados: 0,
+          errores: 0,
+        },
+      ]);
 
       (async () => {
         const supabase = createClient();
@@ -100,22 +107,23 @@ export function ImportJobProvider({ children }: { children: React.ReactNode }) {
 
           const esUltima = i === filas.length - 1;
           if (esUltima || i % CADA_N_FILAS === 0) {
-            setJob((prev) =>
-              prev && prev.id === id
-                ? { ...prev, hecho: i + 1, nuevos, actualizados, errores }
-                : prev,
-            );
+            actualizarJob(id, { hecho: i + 1, nuevos, actualizados, errores });
           }
         }
 
-        setJob((prev) => (prev && prev.id === id ? { ...prev, activo: false } : prev));
-        runningRef.current = false;
+        actualizarJob(id, { activo: false });
       })();
     },
-    [],
+    [actualizarJob],
   );
 
-  return <ImportJobContext.Provider value={{ job, iniciar }}>{children}</ImportJobContext.Provider>;
+  const cerrar = useCallback((id: number) => {
+    setJobs((prev) => prev.filter((j) => j.id !== id));
+  }, []);
+
+  return (
+    <ImportJobContext.Provider value={{ jobs, iniciar, cerrar }}>{children}</ImportJobContext.Provider>
+  );
 }
 
 export function useImportJob() {

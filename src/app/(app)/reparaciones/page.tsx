@@ -1,17 +1,14 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { fromRow, type ArticuloRow } from "@/lib/articulos/types";
+import { fetchTodosLosArticulos } from "@/lib/articulos/fetchAll";
 import { clienteFromRow, type ClienteRow } from "@/lib/clientes/types";
 import { reparacionFromRow, type ReparacionRow } from "@/lib/taller/types";
 import ReparacionesView from "@/components/taller/ReparacionesView";
 
 export default async function ReparacionesPage() {
   const supabase = await createClient();
-  const [{ data: articulosData }, { data: clientesData }, { data: reparacionesData }] = await Promise.all([
-    supabase
-      .from("articulos")
-      .select("id, codigo, descripcion, marca, rubro, costo, precio_minorista, precio_mayorista, iva, codigo_barras, foto_url, stock, stock_minimo")
-      .order("codigo"),
+  const [articulos, { data: clientesData }, { data: reparacionesData }] = await Promise.all([
+    fetchTodosLosArticulos(supabase),
     supabase.from("clientes").select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default"),
     supabase
       .from("reparaciones")
@@ -22,7 +19,7 @@ export default async function ReparacionesPage() {
   return (
     <Suspense>
       <ReparacionesView
-        initialArticulos={((articulosData as ArticuloRow[]) ?? []).map(fromRow)}
+        initialArticulos={articulos}
         initialClientes={((clientesData as ClienteRow[]) ?? []).map(clienteFromRow)}
         initialReparaciones={((reparacionesData as ReparacionRow[]) ?? []).map(reparacionFromRow)}
       />

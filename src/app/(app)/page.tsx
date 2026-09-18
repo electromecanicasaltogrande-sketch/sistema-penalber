@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { fromRow, type ArticuloRow } from "@/lib/articulos/types";
+import { fetchTodosLosArticulos } from "@/lib/articulos/fetchAll";
 import { chequeFromRow, type ChequeRow } from "@/lib/cheques/types";
 import type { VentaRow } from "@/lib/ventas/historial";
 import DashboardView from "@/components/dashboard/DashboardView";
@@ -11,14 +11,12 @@ export default async function DashboardPage() {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   sevenDaysAgo.setHours(0, 0, 0, 0);
 
-  const [{ data: ventasData }, { data: articulosData }, { data: chequesData }] = await Promise.all([
+  const [{ data: ventasData }, articulos, { data: chequesData }] = await Promise.all([
     supabase
       .from("ventas")
       .select("id, numero, tipo, doc_type, empresa_cuit, cliente_nombre, dni, condicion_pago, subtotal, descuento, total, discrimina_iva, cae, cae_vencimiento, creado_en")
       .gte("creado_en", sevenDaysAgo.toISOString()),
-    supabase
-      .from("articulos")
-      .select("id, codigo, descripcion, marca, rubro, costo, precio_minorista, precio_mayorista, iva, codigo_barras, foto_url, stock, stock_minimo"),
+    fetchTodosLosArticulos(supabase),
     supabase
       .from("cheques")
       .select("id, tipo, titular, importe, fecha_cobro, fecha_vencimiento, origen, origen_numero, cobrado")
@@ -26,7 +24,6 @@ export default async function DashboardPage() {
       .order("fecha_vencimiento"),
   ]);
 
-  const articulos = ((articulosData as ArticuloRow[]) ?? []).map(fromRow);
   const stockBajo = articulos.filter((a) => a.stock <= a.stockMinimo);
 
   return (

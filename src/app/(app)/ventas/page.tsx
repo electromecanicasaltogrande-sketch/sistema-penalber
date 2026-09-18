@@ -1,25 +1,19 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { fromRow, type ArticuloRow } from "@/lib/articulos/types";
+import { fetchTodosLosArticulos } from "@/lib/articulos/fetchAll";
 import { clienteFromRow, type ClienteRow } from "@/lib/clientes/types";
 import VentasView from "@/components/ventas/VentasView";
 
 export default async function VentasPage() {
   const supabase = await createClient();
-  const [{ data: articulosData }, { data: clientesData }] = await Promise.all([
-    supabase
-      .from("articulos")
-      .select(
-        "id, codigo, descripcion, marca, rubro, costo, precio_minorista, precio_mayorista, iva, codigo_barras, foto_url, stock, stock_minimo",
-      )
-      .order("codigo"),
+  const [articulos, { data: clientesData }] = await Promise.all([
+    fetchTodosLosArticulos(supabase),
     supabase
       .from("clientes")
       .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default")
       .order("razon_social"),
   ]);
 
-  const articulos = ((articulosData as ArticuloRow[]) ?? []).map(fromRow);
   const clientes = ((clientesData as ClienteRow[]) ?? []).map(clienteFromRow);
 
   return (

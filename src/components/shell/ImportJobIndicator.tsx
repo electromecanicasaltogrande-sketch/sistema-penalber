@@ -1,34 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useImportJob } from "@/lib/import/ImportJobContext";
+import { useEffect, useRef } from "react";
+import { useImportJob, type ImportJobState } from "@/lib/import/ImportJobContext";
 
 export default function ImportJobIndicator() {
-  const { job } = useImportJob();
-  const [visible, setVisible] = useState(false);
+  const { jobs, cerrar } = useImportJob();
+
+  if (jobs.length === 0) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[60] flex w-72 flex-col gap-2.5">
+      {jobs.map((job) => (
+        <JobCard key={job.id} job={job} onClose={() => cerrar(job.id)} />
+      ))}
+    </div>
+  );
+}
+
+function JobCard({ job, onClose }: { job: ImportJobState; onClose: () => void }) {
+  const { cerrar } = useImportJob();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (job) setVisible(true);
-  }, [job?.id]);
-
-  useEffect(() => {
-    if (job && !job.activo) {
-      const t = setTimeout(() => setVisible(false), 6000);
-      return () => clearTimeout(t);
+    if (!job.activo) {
+      timerRef.current = setTimeout(() => cerrar(job.id), 6000);
+      return () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+      };
     }
-  }, [job?.activo, job?.id]);
-
-  if (!job || !visible) return null;
+  }, [job.activo, job.id, cerrar]);
 
   const pct = job.total > 0 ? Math.round((job.hecho / job.total) * 100) : 0;
 
   return (
-    <div className="fixed bottom-4 left-4 z-[60] w-72 rounded-[var(--radius-app)] border border-border bg-surface p-3 shadow-lg">
+    <div className="rounded-[var(--radius-app)] border border-border bg-surface p-3 shadow-lg">
       <div className="mb-1 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-ink">
           {job.activo ? "Importando lista…" : "Importación completa"}
         </p>
-        <button onClick={() => setVisible(false)} className="text-xs text-ink-faint hover:text-ink">
+        <button onClick={onClose} className="text-xs text-ink-faint hover:text-ink">
           ✕
         </button>
       </div>

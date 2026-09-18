@@ -254,8 +254,8 @@ export default function ImportarExcelTab({ articulos }: { articulos: Articulo[] 
         )}
         {encolado && (
           <p className="mt-2 rounded-lg bg-success-soft px-3 py-2 text-xs font-medium text-success">
-            La importación se está procesando en segundo plano — mirá el progreso abajo a la izquierda.
-            Podés seguir usando el sistema mientras tanto.
+            La importación se está procesando en segundo plano — mirá el progreso abajo a la derecha.
+            Podés seguir usando el sistema, e incluso cargar otra lista más, mientras tanto.
           </p>
         )}
       </div>
