@@ -53,6 +53,22 @@ const ALIAS: Record<string, string[]> = {
   IVA: ["IVA"],
 };
 
+// Orden fijo de columnas cuando el archivo viene sin fila de encabezado
+// (como exporta el proveedor EXINTRADER): CODIGO, DESCRIPCION, COSTO CON
+// DESCUENTO, COSTO, MARCA, MODELO, MEDIDA, RUBRO, PRECIO VENTA, IVA.
+const ORDEN_POSICIONAL: (keyof typeof ALIAS)[] = [
+  "CODIGO",
+  "DESCRIPCION",
+  "COSTO CON DESCUENTO",
+  "COSTO",
+  "MARCA",
+  "MODELO",
+  "MEDIDA",
+  "RUBRO",
+  "PRECIO VENTA",
+  "IVA",
+];
+
 function buscarValor(fila: Record<string, unknown>, campo: keyof typeof ALIAS): unknown {
   const normalizados: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fila)) normalizados[normalizarClave(k)] = v;
@@ -60,6 +76,21 @@ function buscarValor(fila: Record<string, unknown>, campo: keyof typeof ALIAS): 
     if (alias in normalizados) return normalizados[alias];
   }
   return undefined;
+}
+
+const ALIAS_PLANOS = new Set(Object.values(ALIAS).flat());
+
+// Si la primera fila trae al menos dos celdas que coinciden con nombres de
+// columna conocidos, la tratamos como encabezado; si no (por ej. el archivo
+// arranca directo con el código numérico del primer artículo), asumimos que
+// no hay encabezado y usamos el orden fijo de columnas.
+function tieneEncabezado(primeraFila: unknown[]): boolean {
+  let coincidencias = 0;
+  for (const celda of primeraFila) {
+    if (typeof celda !== "string") continue;
+    if (ALIAS_PLANOS.has(normalizarClave(celda))) coincidencias++;
+  }
+  return coincidencias >= 2;
 }
 
 export default function ImportarExcelTab({
@@ -104,15 +135,36 @@ export default function ImportarExcelTab({
         const data = ev.target?.result;
         const wb = XLSX.read(data, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const crudas: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+        const noVacias = crudas.filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
 
-        if (rows.length === 0) {
+        if (noVacias.length === 0) {
           setLeyendo(false);
           setError("El archivo no tiene filas de datos.");
           return;
         }
 
-        setColumnasDetectadas(Object.keys(rows[0]));
+        const conEncabezado = tieneEncabezado(noVacias[0]);
+        let rows: Record<string, unknown>[];
+
+        if (conEncabezado) {
+          const headers = noVacias[0].map((h) => String(h ?? "").trim());
+          rows = noVacias.slice(1).map((r) => {
+            const obj: Record<string, unknown> = {};
+            headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
+            return obj;
+          });
+          setColumnasDetectadas(headers);
+        } else {
+          rows = noVacias.map((r) => {
+            const obj: Record<string, unknown> = {};
+            ORDEN_POSICIONAL.forEach((campo, i) => (obj[campo] = r[i] ?? ""));
+            return obj;
+          });
+          setColumnasDetectadas([
+            `Sin fila de encabezado — se usó el orden fijo: ${ORDEN_POSICIONAL.join(", ")}`,
+          ]);
+        }
 
         const codigosExistentes = new Set(articulos.map((a) => a.codigo.toLowerCase()));
         const parsed: FilaImport[] = rows
@@ -137,7 +189,9 @@ export default function ImportarExcelTab({
         setLeyendo(false);
         if (parsed.length === 0) {
           setError(
-            "Se leyó el archivo pero ninguna fila tiene código. Revisá que la primera fila sea el encabezado y que exista la columna CODIGO.",
+            conEncabezado
+              ? "Se leyó el archivo pero ninguna fila tiene código. Revisá que exista la columna CODIGO."
+              : "Se leyó el archivo pero ninguna fila tiene código en la primera columna.",
           );
           return;
         }
