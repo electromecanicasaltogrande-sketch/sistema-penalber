@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { money } from "@/lib/format";
 import { diasHasta, estadoCheque, type Cheque } from "@/lib/cheques/types";
-import type { Articulo } from "@/lib/articulos/types";
 import type { VentaRow } from "@/lib/ventas/historial";
 
 function ymd(d: Date) {
@@ -13,13 +12,9 @@ function ymd(d: Date) {
 
 export default function DashboardView({
   ventas7dias,
-  stockBajo,
-  stockBajoTotal,
   cheques,
 }: {
   ventas7dias: VentaRow[];
-  stockBajo: Articulo[];
-  stockBajoTotal: number;
   cheques: Cheque[];
 }) {
   const hoy = ymd(new Date());
@@ -55,11 +50,10 @@ export default function DashboardView({
 
   return (
     <div>
-      <div className="mb-5 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
         <Metric label="Ventas totales de hoy" value={money(totalHoy)} />
         <Metric label="Vendido en efectivo" value={money(efectivoHoy)} />
         <Metric label="Vendido facturado" value={money(facturadoHoy)} />
-        <Metric label="Artículos con stock bajo" value={String(stockBajoTotal)} danger={stockBajoTotal > 0} />
       </div>
 
       <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -121,30 +115,6 @@ export default function DashboardView({
             </div>
           )}
         </div>
-      </div>
-
-      <div className="rounded-[var(--radius-app)] border border-border bg-surface p-4">
-        <p className="mb-2 text-sm font-semibold text-ink">Stock bajo mínimo</p>
-        {stockBajo.length === 0 ? (
-          <p className="text-sm text-ink-faint">Todo el stock está por encima del mínimo. 🎉</p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {stockBajo.map((a) => (
-              <Link
-                key={a.id}
-                href="/articulos"
-                className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:bg-bg"
-              >
-                <span>
-                  {a.codigo} — {a.descripcion}
-                </span>
-                <span className="rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger">
-                  {a.stock} / mín. {a.stockMinimo}
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
