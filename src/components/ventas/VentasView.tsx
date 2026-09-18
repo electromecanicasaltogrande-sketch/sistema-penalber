@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { articleMatches } from "@/lib/search";
+import { buscarArticuloExacto, buscarArticulosPorCodigos } from "@/lib/articulos/search";
+import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
+import type { Articulo } from "@/lib/articulos/types";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
-import type { Articulo } from "@/lib/articulos/types";
 import type { Cliente } from "@/lib/clientes/types";
 import { DOC_LABELS, FORMAS_PAGO, type CartItem, type CondicionPago, type DocType } from "@/lib/ventas/types";
 import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
@@ -27,13 +28,10 @@ const FIELD_BASE =
 const FIELD = `${FIELD_BASE} w-full`;
 
 export default function VentasView({
-  initialArticulos,
   initialClientes,
 }: {
-  initialArticulos: Articulo[];
   initialClientes: Cliente[];
 }) {
-  const [articulos, setArticulos] = useState(initialArticulos);
   const [clientes] = useState(initialClientes);
 
   const [entryMode, setEntryMode] = useState<"code" | "manual">("code");
@@ -164,13 +162,7 @@ export default function VentasView({
       .slice(0, 6);
   }, [clienteSearch, clientes]);
 
-  const scanSuggestions = useMemo(() => {
-    const q = scanTerm.trim().toLowerCase();
-    if (q.length < 2) return [];
-    const exact = articulos.find((a) => a.codigo.toLowerCase() === q);
-    if (exact) return [];
-    return articulos.filter((a) => articleMatches(a, q)).slice(0, 5);
-  }, [scanTerm, articulos]);
+  const scanSuggestions = useBuscadorArticulos(scanTerm, 5);
 
   function addToCart(articulo: Articulo) {
     setCart((prev) => {
@@ -198,18 +190,16 @@ export default function VentasView({
     scanRef.current?.focus();
   }
 
-  function addByCode() {
+  async function addByCode() {
     const term = scanTerm.trim();
     if (!term) return;
-    const byBarcode = articulos.find((a) => a.codigoBarras && a.codigoBarras === term);
-    if (byBarcode) return addToCart(byBarcode);
-    const exact = articulos.find((a) => a.codigo.toLowerCase() === term.toLowerCase());
-    if (exact) return addToCart(exact);
-    const matches = articulos.filter((a) => articleMatches(a, term));
-    if (matches.length === 1) return addToCart(matches[0]);
-    if (matches.length > 1) {
+    const supabase = createClient();
+    const exacto = await buscarArticuloExacto(supabase, term);
+    if (exacto) return addToCart(exacto);
+    if (scanSuggestions.length === 1) return addToCart(scanSuggestions[0]);
+    if (scanSuggestions.length > 1) {
       if (pendingTerm === term) {
-        addToCart(matches[0]);
+        addToCart(scanSuggestions[0]);
         setPendingTerm(null);
       } else {
         setPendingTerm(term);
@@ -329,18 +319,14 @@ export default function VentasView({
       );
 
       if (!isNC) {
+        const codigosCarrito = cart.filter((c) => c.codigo).map((c) => c.codigo as string);
+        const arts = await buscarArticulosPorCodigos(supabase, codigosCarrito);
         for (const c of cart) {
           if (!c.codigo) continue;
-          const art = articulos.find((a) => a.codigo === c.codigo);
+          const art = arts.find((a) => a.codigo === c.codigo);
           if (!art) continue;
           await supabase.rpc("descontar_stock", { p_articulo_id: art.id, p_cantidad: c.cantidad });
         }
-        setArticulos((prev) =>
-          prev.map((a) => {
-            const line = cart.find((c) => c.codigo === a.codigo);
-            return line ? { ...a, stock: Math.max(0, a.stock - line.cantidad) } : a;
-          }),
-        );
       }
 
       if (condicionPago === "cta_cte" && selectedCliente && !isNC) {

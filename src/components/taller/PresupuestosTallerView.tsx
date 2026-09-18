@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { articleMatches } from "@/lib/search";
+import { buscarArticuloExacto } from "@/lib/articulos/search";
+import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
 import { money } from "@/lib/format";
 import type { Articulo } from "@/lib/articulos/types";
 import type { Cliente } from "@/lib/clientes/types";
@@ -14,15 +15,12 @@ const FIELD_BASE =
 const FIELD = `${FIELD_BASE} w-full`;
 
 export default function PresupuestosTallerView({
-  initialArticulos,
   initialClientes,
   initialPresupuestos,
 }: {
-  initialArticulos: Articulo[];
   initialClientes: Cliente[];
   initialPresupuestos: PresupuestoTaller[];
 }) {
-  const [articulos] = useState(initialArticulos);
   const [clientes] = useState(initialClientes);
   const [presupuestos, setPresupuestos] = useState(initialPresupuestos);
 
@@ -47,13 +45,7 @@ export default function PresupuestosTallerView({
     return clientes.filter((c) => c.razonSocial.toLowerCase().includes(q)).slice(0, 5);
   }, [clienteNombre, clientes]);
 
-  const scanSuggestions = useMemo(() => {
-    const q = scanTerm.trim().toLowerCase();
-    if (q.length < 2) return [];
-    const exact = articulos.find((a) => a.codigo.toLowerCase() === q);
-    if (exact) return [];
-    return articulos.filter((a) => articleMatches(a, q)).slice(0, 5);
-  }, [scanTerm, articulos]);
+  const scanSuggestions = useBuscadorArticulos(scanTerm, 5);
 
   function addToCart(a: Articulo) {
     setCart((prev) => {
@@ -63,13 +55,13 @@ export default function PresupuestosTallerView({
     });
     setScanTerm("");
   }
-  function addByCode() {
+  async function addByCode() {
     const term = scanTerm.trim();
     if (!term) return;
-    const exact = articulos.find((a) => a.codigo.toLowerCase() === term.toLowerCase());
-    if (exact) return addToCart(exact);
-    const matches = articulos.filter((a) => articleMatches(a, term));
-    if (matches.length >= 1) return addToCart(matches[0]);
+    const supabase = createClient();
+    const exacto = await buscarArticuloExacto(supabase, term);
+    if (exacto) return addToCart(exacto);
+    if (scanSuggestions.length >= 1) return addToCart(scanSuggestions[0]);
     setError("No se encontró ningún artículo con ese código.");
   }
   function addManual() {

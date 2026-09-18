@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { articleMatches } from "@/lib/search";
+import { buscarArticuloExacto, buscarArticulosPorCodigos } from "@/lib/articulos/search";
+import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
 import { money } from "@/lib/format";
 import type { Articulo } from "@/lib/articulos/types";
 import type { Cliente } from "@/lib/clientes/types";
@@ -18,16 +19,13 @@ const FIELD_BASE =
 const FIELD = `${FIELD_BASE} w-full`;
 
 export default function ReparacionesView({
-  initialArticulos,
   initialClientes,
   initialReparaciones,
 }: {
-  initialArticulos: Articulo[];
   initialClientes: Cliente[];
   initialReparaciones: Reparacion[];
 }) {
   const searchParams = useSearchParams();
-  const [articulos, setArticulos] = useState(initialArticulos);
   const [clientes] = useState(initialClientes);
   const [reparaciones, setReparaciones] = useState(initialReparaciones);
 
@@ -92,13 +90,7 @@ export default function ReparacionesView({
     return clientes.filter((c) => c.razonSocial.toLowerCase().includes(q)).slice(0, 5);
   }, [clienteNombre, clientes]);
 
-  const scanSuggestions = useMemo(() => {
-    const q = scanTerm.trim().toLowerCase();
-    if (q.length < 2) return [];
-    const exact = articulos.find((a) => a.codigo.toLowerCase() === q);
-    if (exact) return [];
-    return articulos.filter((a) => articleMatches(a, q)).slice(0, 5);
-  }, [scanTerm, articulos]);
+  const scanSuggestions = useBuscadorArticulos(scanTerm, 5);
 
   function addToCart(a: Articulo) {
     setCart((prev) => {
@@ -108,13 +100,13 @@ export default function ReparacionesView({
     });
     setScanTerm("");
   }
-  function addByCode() {
+  async function addByCode() {
     const term = scanTerm.trim();
     if (!term) return;
-    const exact = articulos.find((a) => a.codigo.toLowerCase() === term.toLowerCase());
-    if (exact) return addToCart(exact);
-    const matches = articulos.filter((a) => articleMatches(a, term));
-    if (matches.length >= 1) return addToCart(matches[0]);
+    const supabase = createClient();
+    const exacto = await buscarArticuloExacto(supabase, term);
+    if (exacto) return addToCart(exacto);
+    if (scanSuggestions.length >= 1) return addToCart(scanSuggestions[0]);
     setError("No se encontró ningún artículo con ese código.");
   }
   function addManual() {
@@ -180,17 +172,13 @@ export default function ReparacionesView({
         })),
       );
 
+      const codigosCarrito = cart.filter((c) => c.codigo).map((c) => c.codigo as string);
+      const arts = await buscarArticulosPorCodigos(supabase, codigosCarrito);
       for (const c of cart) {
         if (!c.codigo) continue;
-        const art = articulos.find((a) => a.codigo === c.codigo);
+        const art = arts.find((a) => a.codigo === c.codigo);
         if (art) await supabase.rpc("descontar_stock", { p_articulo_id: art.id, p_cantidad: c.cantidad });
       }
-      setArticulos((prev) =>
-        prev.map((a) => {
-          const line = cart.find((c) => c.codigo === a.codigo);
-          return line ? { ...a, stock: a.stock - line.cantidad } : a;
-        }),
-      );
 
       if ((condicionPago === "cheque" || condicionPago === "echeq") && chequeData) {
         await supabase.from("cheques").insert({

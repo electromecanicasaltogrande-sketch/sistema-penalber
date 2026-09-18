@@ -1,12 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { fetchTodosLosArticulos } from "@/lib/articulos/fetchAll";
 import { clienteFromRow, type ClienteRow } from "@/lib/clientes/types";
 import DevolucionesView from "@/components/devoluciones/DevolucionesView";
 
 export default async function DevolucionesPage() {
   const supabase = await createClient();
-  const [articulos, { data: clientesData }, { data: devData }] = await Promise.all([
-    fetchTodosLosArticulos(supabase),
+  const [{ data: clientesData }, { data: devData }] = await Promise.all([
     supabase.from("clientes").select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default").order("razon_social"),
     supabase
       .from("devoluciones")
@@ -17,7 +15,6 @@ export default async function DevolucionesPage() {
 
   return (
     <DevolucionesView
-      initialArticulos={articulos}
       initialClientes={((clientesData as ClienteRow[]) ?? []).map(clienteFromRow)}
       initialDevoluciones={devData ?? []}
     />

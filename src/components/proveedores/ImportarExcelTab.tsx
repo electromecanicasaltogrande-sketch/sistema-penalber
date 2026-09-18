@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
+import { createClient } from "@/lib/supabase/client";
+import { codigosExistentes as buscarCodigosExistentes } from "@/lib/articulos/search";
 import { money } from "@/lib/format";
-import type { Articulo } from "@/lib/articulos/types";
 import { useImportJob, type FilaImportJob } from "@/lib/import/ImportJobContext";
 
 interface FilaImport extends FilaImportJob {
@@ -85,13 +86,14 @@ function tieneEncabezado(primeraFila: unknown[]): boolean {
   return coincidencias >= 2;
 }
 
-export default function ImportarExcelTab({ articulos }: { articulos: Articulo[] }) {
+export default function ImportarExcelTab() {
   const { iniciar } = useImportJob();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [filas, setFilas] = useState<FilaImport[]>([]);
   const [columnasDetectadas, setColumnasDetectadas] = useState<string[]>([]);
   const [campos, setCampos] = useState<Set<string>>(new Set(CAMPOS.map((c) => c.id)));
   const [leyendo, setLeyendo] = useState(false);
+  const [verificando, setVerificando] = useState(false);
   const [error, setError] = useState("");
   const [encolado, setEncolado] = useState(false);
 
@@ -137,7 +139,7 @@ export default function ImportarExcelTab({ articulos }: { articulos: Articulo[] 
     reader.readAsArrayBuffer(archivo);
   }
 
-  function procesarHojaSeleccionada() {
+  async function procesarHojaSeleccionada() {
     if (!workbook) return;
     const sheet = workbook.Sheets[hojaSeleccionada];
     if (!sheet) {
@@ -174,29 +176,23 @@ export default function ImportarExcelTab({ articulos }: { articulos: Articulo[] 
       setColumnasDetectadas([`Sin fila de encabezado — se usó el orden fijo: ${ORDEN_POSICIONAL.join(", ")}`]);
     }
 
-    const codigosExistentes = new Set(articulos.map((a) => a.codigo.toLowerCase()));
-    const parsed: FilaImport[] = rows
-      .map((r) => {
-        const codigo = String(buscarValor(r, "CODIGO") ?? "").trim();
-        return {
-          codigo,
-          descripcion: String(buscarValor(r, "DESCRIPCION") ?? "").trim(),
-          costoConDescuento: Number(buscarValor(r, "COSTO CON DESCUENTO")) || 0,
-          costo: Number(buscarValor(r, "COSTO")) || 0,
-          marca: String(buscarValor(r, "MARCA") ?? "").trim(),
-          modelo: String(buscarValor(r, "MODELO") ?? "").trim(),
-          medida: String(buscarValor(r, "MEDIDA") ?? "").trim(),
-          rubro: String(buscarValor(r, "RUBRO") ?? "").trim(),
-          precioVenta: Number(buscarValor(r, "PRECIO VENTA")) || 0,
-          iva: Number(buscarValor(r, "IVA")) || 21,
-          existe: codigosExistentes.has(codigo.toLowerCase()),
-        };
-      })
+    const crudo = rows
+      .map((r) => ({
+        codigo: String(buscarValor(r, "CODIGO") ?? "").trim(),
+        descripcion: String(buscarValor(r, "DESCRIPCION") ?? "").trim(),
+        costoConDescuento: Number(buscarValor(r, "COSTO CON DESCUENTO")) || 0,
+        costo: Number(buscarValor(r, "COSTO")) || 0,
+        marca: String(buscarValor(r, "MARCA") ?? "").trim(),
+        modelo: String(buscarValor(r, "MODELO") ?? "").trim(),
+        medida: String(buscarValor(r, "MEDIDA") ?? "").trim(),
+        rubro: String(buscarValor(r, "RUBRO") ?? "").trim(),
+        precioVenta: Number(buscarValor(r, "PRECIO VENTA")) || 0,
+        iva: Number(buscarValor(r, "IVA")) || 21,
+      }))
       .filter((f) => f.codigo);
 
-    setModalHojaAbierto(false);
-    setError("");
-    if (parsed.length === 0) {
+    if (crudo.length === 0) {
+      setModalHojaAbierto(false);
       setError(
         conEncabezado
           ? `Se leyó la hoja "${hojaSeleccionada}" pero ninguna fila tiene código. Revisá que exista la columna CODIGO.`
@@ -204,6 +200,25 @@ export default function ImportarExcelTab({ articulos }: { articulos: Articulo[] 
       );
       return;
     }
+
+    // Solo se consultan en la base los códigos que trae este archivo (no el
+    // catálogo entero), en tandas — así funciona igual de rápido con 100
+    // filas que con 100.000 artículos ya cargados.
+    setVerificando(true);
+    const supabase = createClient();
+    const existentes = await buscarCodigosExistentes(
+      supabase,
+      crudo.map((f) => f.codigo),
+    );
+    setVerificando(false);
+
+    const parsed: FilaImport[] = crudo.map((f) => ({
+      ...f,
+      existe: existentes.has(f.codigo.toLowerCase()),
+    }));
+
+    setModalHojaAbierto(false);
+    setError("");
     setFilas(parsed);
   }
 
@@ -354,9 +369,10 @@ export default function ImportarExcelTab({ articulos }: { articulos: Articulo[] 
               </button>
               <button
                 onClick={procesarHojaSeleccionada}
-                className="rounded-lg bg-copper px-4 py-2 text-sm font-semibold text-white hover:bg-copper-dark"
+                disabled={verificando}
+                className="rounded-lg bg-copper px-4 py-2 text-sm font-semibold text-white hover:bg-copper-dark disabled:opacity-60"
               >
-                Cargar
+                {verificando ? "Verificando…" : "Cargar"}
               </button>
             </div>
           </div>

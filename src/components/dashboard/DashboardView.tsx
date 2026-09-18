@@ -14,10 +14,12 @@ function ymd(d: Date) {
 export default function DashboardView({
   ventas7dias,
   stockBajo,
+  stockBajoTotal,
   cheques,
 }: {
   ventas7dias: VentaRow[];
   stockBajo: Articulo[];
+  stockBajoTotal: number;
   cheques: Cheque[];
 }) {
   const hoy = ymd(new Date());
@@ -57,7 +59,7 @@ export default function DashboardView({
         <Metric label="Ventas totales de hoy" value={money(totalHoy)} />
         <Metric label="Vendido en efectivo" value={money(efectivoHoy)} />
         <Metric label="Vendido facturado" value={money(facturadoHoy)} />
-        <Metric label="Artículos con stock bajo" value={String(stockBajo.length)} danger={stockBajo.length > 0} />
+        <Metric label="Artículos con stock bajo" value={String(stockBajoTotal)} danger={stockBajoTotal > 0} />
       </div>
 
       <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -127,7 +129,7 @@ export default function DashboardView({
           <p className="text-sm text-ink-faint">Todo el stock está por encima del mínimo. 🎉</p>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {stockBajo.slice(0, 12).map((a) => (
+            {stockBajo.map((a) => (
               <Link
                 key={a.id}
                 href="/articulos"

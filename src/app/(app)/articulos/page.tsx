@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { fetchTodosLosArticulos } from "@/lib/articulos/fetchAll";
+import { buscarArticulosPaginado } from "@/lib/articulos/search";
 import ArticulosView from "@/components/articulos/ArticulosView";
+
+const TAMANO_PAGINA = 50;
 
 export default async function ArticulosPage() {
   const supabase = await createClient();
-  const articulos = await fetchTodosLosArticulos(supabase);
+  const { articulos, total } = await buscarArticulosPaginado(supabase, {}, 0, TAMANO_PAGINA);
 
-  return <ArticulosView initialArticulos={articulos} />;
+  return <ArticulosView initialArticulos={articulos} initialTotal={total} />;
 }

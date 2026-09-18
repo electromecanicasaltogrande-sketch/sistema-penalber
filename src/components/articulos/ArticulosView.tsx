@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { articleMatches } from "@/lib/search";
+import {
+  buscarArticulosPaginado,
+  listarMarcasDistintas,
+  listarRubrosDistintos,
+} from "@/lib/articulos/search";
 import { money } from "@/lib/format";
-import { fromRow, stockClass, type Articulo, type ArticuloRow } from "@/lib/articulos/types";
+import { stockClass, type Articulo } from "@/lib/articulos/types";
 import ArticuloModal from "./ArticuloModal";
 
-type SortField = "codigo" | "stock" | null;
+type SortField = "codigo" | "stock";
 
 const STOCK_CLASSES: Record<ReturnType<typeof stockClass>, string> = {
   low: "bg-danger-soft text-danger",
@@ -15,43 +19,101 @@ const STOCK_CLASSES: Record<ReturnType<typeof stockClass>, string> = {
   ok: "bg-success-soft text-success",
 };
 
-export default function ArticulosView({ initialArticulos }: { initialArticulos: Articulo[] }) {
+const TAMANO_PAGINA = 50;
+
+export default function ArticulosView({
+  initialArticulos,
+  initialTotal,
+}: {
+  initialArticulos: Articulo[];
+  initialTotal: number;
+}) {
   const [articulos, setArticulos] = useState(initialArticulos);
+  const [total, setTotal] = useState(initialTotal);
+  const [pagina, setPagina] = useState(0);
+  const [cargando, setCargando] = useState(false);
+
   const [search, setSearch] = useState("");
   const [selectedRubros, setSelectedRubros] = useState<string[]>([]);
   const [selectedMarcas, setSelectedMarcas] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<SortField>(null);
+  const [rubrosDisponibles, setRubrosDisponibles] = useState<string[]>([]);
+  const [marcasDisponibles, setMarcasDisponibles] = useState<string[]>([]);
+
+  const [sortField, setSortField] = useState<SortField>("codigo");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
+
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedDetalle, setSelectedDetalle] = useState<Record<string, Articulo>>({});
   const [modal, setModal] = useState<{ mode: "new" } | { mode: "edit"; articulo: Articulo } | null>(
     null,
   );
   const [zoomed, setZoomed] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
 
+  // Con 50-100 mil artículos, cargar y filtrar todo en el navegador es
+  // inviable: se busca y pagina del lado del servidor (ver
+  // src/lib/articulos/search.ts y la migración 0013 con los índices
+  // trigram que hacen esto rápido).
+  async function cargarPagina() {
+    setCargando(true);
+    const supabase = createClient();
+    const { articulos: pagina_, total: total_ } = await buscarArticulosPaginado(
+      supabase,
+      { texto: search, rubros: selectedRubros, marcas: selectedMarcas },
+      pagina,
+      TAMANO_PAGINA,
+      { campo: sortField, ascendente: sortDir === 1 },
+    );
+    setArticulos(pagina_);
+    setTotal(total_);
+    setCargando(false);
+  }
+
+  const esPrimerRenderRef = useRef(true);
+  useEffect(() => {
+    if (esPrimerRenderRef.current) {
+      esPrimerRenderRef.current = false;
+      return;
+    }
+    const t = setTimeout(cargarPagina, search ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, selectedRubros, selectedMarcas, pagina, sortField, sortDir]);
+
+  useEffect(() => {
+    setPagina(0);
+  }, [search, selectedRubros, selectedMarcas]);
+
   useEffect(() => {
     const supabase = createClient();
+    Promise.all([listarRubrosDistintos(supabase), listarMarcasDistintas(supabase)]).then(
+      ([rubros, marcas]) => {
+        setRubrosDisponibles(rubros);
+        setMarcasDisponibles(marcas);
+      },
+    );
+  }, []);
+
+  // Cualquier alta/edición/baja (desde esta pestaña o desde otra —
+  // importación, otra caja, etc.) refresca la página actual en vez de
+  // intentar parchear en memoria una lista paginada/filtrada. Un solo canal
+  // para toda la vida del componente; siempre llama a la versión más
+  // reciente de cargarPagina (con los filtros/página actuales) vía ref.
+  const cargarPaginaRef = useRef(cargarPagina);
+  cargarPaginaRef.current = cargarPagina;
+
+  useEffect(() => {
+    const supabase = createClient();
+    let t: ReturnType<typeof setTimeout>;
     const channel = supabase
       .channel("articulos-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "articulos" },
-        (payload) => {
-          if (payload.eventType === "DELETE") {
-            setArticulos((prev) => prev.filter((a) => a.id !== (payload.old as ArticuloRow).id));
-            return;
-          }
-          const updated = fromRow(payload.new as ArticuloRow);
-          setArticulos((prev) => {
-            const exists = prev.some((a) => a.id === updated.id);
-            return exists
-              ? prev.map((a) => (a.id === updated.id ? updated : a))
-              : [...prev, updated];
-          });
-        },
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "articulos" }, () => {
+        clearTimeout(t);
+        t = setTimeout(() => cargarPaginaRef.current(), 400);
+      })
       .subscribe();
     return () => {
+      clearTimeout(t);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -67,41 +129,12 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
     };
   }, [printing]);
 
-  const rubros = useMemo(
-    () => [...new Set(articulos.map((a) => a.rubro))].sort(),
-    [articulos],
-  );
-  const marcas = useMemo(
-    () => [...new Set(articulos.map((a) => a.marca).filter(Boolean))].sort(),
-    [articulos],
-  );
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    let list = articulos.filter((a) => {
-      const matchQ = !q || articleMatches(a, q);
-      const matchR = selectedRubros.length === 0 || selectedRubros.includes(a.rubro);
-      const matchM = selectedMarcas.length === 0 || selectedMarcas.includes(a.marca);
-      return matchQ && matchR && matchM;
-    });
-    if (sortField === "codigo") {
-      list = [...list].sort(
-        (a, b) => sortDir * a.codigo.localeCompare(b.codigo, undefined, { numeric: true }),
-      );
-    } else if (sortField === "stock") {
-      list = [...list].sort((a, b) => sortDir * (a.stock - b.stock));
-    }
-    return list;
-  }, [articulos, search, selectedRubros, selectedMarcas, sortField, sortDir]);
-
-  function toggleSort(field: "codigo" | "stock") {
+  function toggleSort(field: SortField) {
     if (sortField !== field) {
       setSortField(field);
       setSortDir(1);
-    } else if (sortDir === 1) {
-      setSortDir(-1);
     } else {
-      setSortField(null);
+      setSortDir((d) => (d === 1 ? -1 : 1));
     }
   }
 
@@ -113,21 +146,35 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
     setSelectedMarcas((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
   }
 
-  function toggleSelect(codigo: string, checked: boolean) {
-    setSelected((prev) => (checked ? [...prev, codigo] : prev.filter((c) => c !== codigo)));
+  function toggleSelect(a: Articulo, checked: boolean) {
+    setSelected((prev) => (checked ? [...prev, a.codigo] : prev.filter((c) => c !== a.codigo)));
+    setSelectedDetalle((prev) => {
+      if (checked) return { ...prev, [a.codigo]: a };
+      const next = { ...prev };
+      delete next[a.codigo];
+      return next;
+    });
   }
 
-  function toggleSelectAll(checked: boolean) {
-    const visible = filtered.map((a) => a.codigo);
+  function toggleSelectAllVisible(checked: boolean) {
+    const visibles = articulos.map((a) => a.codigo);
     setSelected((prev) =>
-      checked
-        ? [...new Set([...prev, ...visible])]
-        : prev.filter((c) => !visible.includes(c)),
+      checked ? [...new Set([...prev, ...visibles])] : prev.filter((c) => !visibles.includes(c)),
     );
+    setSelectedDetalle((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        for (const a of articulos) next[a.codigo] = a;
+      } else {
+        for (const a of articulos) delete next[a.codigo];
+      }
+      return next;
+    });
   }
 
-  const selectedItems = articulos.filter((a) => selected.includes(a.codigo));
-  const allVisibleSelected = filtered.length > 0 && filtered.every((a) => selected.includes(a.codigo));
+  const selectedItems = Object.values(selectedDetalle);
+  const allVisibleSelected = articulos.length > 0 && articulos.every((a) => selected.includes(a.codigo));
+  const totalPaginas = Math.max(1, Math.ceil(total / TAMANO_PAGINA));
 
   return (
     <div>
@@ -139,26 +186,15 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
           className="min-w-[260px] flex-1 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper"
         />
 
-        <FiltroMultiple
-          label="Marcas"
-          opciones={marcas}
-          seleccion={selectedMarcas}
-          onToggle={toggleMarca}
-        />
-
-        <FiltroMultiple
-          label="Rubros"
-          opciones={rubros}
-          seleccion={selectedRubros}
-          onToggle={toggleRubro}
-        />
+        <FiltroMultiple label="Marcas" opciones={marcasDisponibles} seleccion={selectedMarcas} onToggle={toggleMarca} />
+        <FiltroMultiple label="Rubros" opciones={rubrosDisponibles} seleccion={selectedRubros} onToggle={toggleRubro} />
 
         <button
           disabled={selected.length === 0}
           onClick={() => setPrinting(true)}
           className="rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-ink-soft hover:bg-bg disabled:opacity-40"
         >
-          🖨 Imprimir seleccionados
+          🖨 Imprimir seleccionados ({selected.length})
         </button>
 
         <button
@@ -174,11 +210,7 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
           <thead>
             <tr className="border-b border-border text-left text-[10.5px] font-bold uppercase tracking-wide text-ink-faint">
               <th className="px-2.5 py-2">
-                <input
-                  type="checkbox"
-                  checked={allVisibleSelected}
-                  onChange={(e) => toggleSelectAll(e.target.checked)}
-                />
+                <input type="checkbox" checked={allVisibleSelected} onChange={(e) => toggleSelectAllVisible(e.target.checked)} />
               </th>
               <th className="px-2.5 py-2"></th>
               <th className="cursor-pointer px-2.5 py-2" onClick={() => toggleSort("codigo")}>
@@ -198,14 +230,10 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
             </tr>
           </thead>
           <tbody>
-            {filtered.map((a) => (
+            {articulos.map((a) => (
               <tr key={a.id} className="border-b border-border last:border-none">
                 <td className="px-2.5 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(a.codigo)}
-                    onChange={(e) => toggleSelect(a.codigo, e.target.checked)}
-                  />
+                  <input type="checkbox" checked={selected.includes(a.codigo)} onChange={(e) => toggleSelect(a, e.target.checked)} />
                 </td>
                 <td className="px-2.5 py-2.5">
                   {a.fotoUrl ? (
@@ -227,15 +255,11 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
                 <td className="px-2.5 py-2.5 font-mono text-xs">{money(a.precioMinorista)}</td>
                 <td className="px-2.5 py-2.5 font-mono text-xs">{money(a.precioMayorista)}</td>
                 <td className="px-2.5 py-2.5 font-mono text-xs">{a.iva}%</td>
-                <td
-                  className={`px-2.5 py-2.5 font-mono text-xs ${a.codigoBarras ? "text-ink" : "text-ink-faint"}`}
-                >
+                <td className={`px-2.5 py-2.5 font-mono text-xs ${a.codigoBarras ? "text-ink" : "text-ink-faint"}`}>
                   {a.codigoBarras || "— sin cargar —"}
                 </td>
                 <td className="px-2.5 py-2.5">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STOCK_CLASSES[stockClass(a)]}`}
-                  >
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STOCK_CLASSES[stockClass(a)]}`}>
                     {a.stock} u.
                   </span>
                 </td>
@@ -251,20 +275,42 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && (
-          <p className="px-4 py-10 text-center text-sm text-ink-faint">
-            No hay artículos que coincidan con la búsqueda.
-          </p>
+        {!cargando && articulos.length === 0 && (
+          <p className="px-4 py-10 text-center text-sm text-ink-faint">No hay artículos que coincidan con la búsqueda.</p>
         )}
+        {cargando && <p className="px-4 py-10 text-center text-sm text-ink-faint">Buscando…</p>}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between text-xs text-ink-faint">
+        <span>{total.toLocaleString("es-AR")} artículos en total</span>
+        <div className="flex items-center gap-2.5">
+          <button
+            disabled={pagina === 0}
+            onClick={() => setPagina((p) => Math.max(0, p - 1))}
+            className="rounded-lg border border-border px-3 py-1.5 font-medium text-ink-soft hover:bg-bg disabled:opacity-40"
+          >
+            ← Anterior
+          </button>
+          <span>
+            Página {pagina + 1} de {totalPaginas}
+          </span>
+          <button
+            disabled={pagina + 1 >= totalPaginas}
+            onClick={() => setPagina((p) => p + 1)}
+            className="rounded-lg border border-border px-3 py-1.5 font-medium text-ink-soft hover:bg-bg disabled:opacity-40"
+          >
+            Siguiente →
+          </button>
+        </div>
       </div>
 
       {modal?.mode === "new" && (
         <ArticuloModal
           mode="new"
           onClose={() => setModal(null)}
-          onSaved={(a) => {
-            setArticulos((prev) => [...prev, a]);
+          onSaved={() => {
             setModal(null);
+            cargarPagina();
           }}
         />
       )}
@@ -273,18 +319,15 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
           mode="edit"
           articulo={modal.articulo}
           onClose={() => setModal(null)}
-          onSaved={(a) => {
-            setArticulos((prev) => prev.map((x) => (x.id === a.id ? a : x)));
+          onSaved={() => {
             setModal(null);
+            cargarPagina();
           }}
         />
       )}
 
       {zoomed && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6"
-          onClick={() => setZoomed(null)}
-        >
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-6" onClick={() => setZoomed(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={zoomed} alt="" className="max-h-[85vh] max-w-[85vw] rounded-lg" />
         </div>
@@ -292,9 +335,7 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
 
       {printing && (
         <div className="print-only fixed inset-0 z-50 hidden bg-white p-8 print:block">
-          <h2 className="mb-4 font-[family-name:var(--font-display)] text-lg font-bold">
-            Listado de artículos
-          </h2>
+          <h2 className="mb-4 font-[family-name:var(--font-display)] text-lg font-bold">Listado de artículos</h2>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-black/30 text-left">
@@ -364,17 +405,12 @@ function FiltroMultiple({
             </button>
           )}
           {opciones.map((o) => (
-            <label
-              key={o}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-bg"
-            >
+            <label key={o} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-bg">
               <input type="checkbox" checked={seleccion.includes(o)} onChange={() => onToggle(o)} />
               {o}
             </label>
           ))}
-          {opciones.length === 0 && (
-            <p className="px-2 py-1.5 text-xs text-ink-faint">Sin {label.toLowerCase()} todavía</p>
-          )}
+          {opciones.length === 0 && <p className="px-2 py-1.5 text-xs text-ink-faint">Sin {label.toLowerCase()} todavía</p>}
         </div>
       )}
     </div>

@@ -2,10 +2,10 @@
 
 import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { buscarArticulosPorCodigos } from "@/lib/articulos/search";
+import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
-import { articleMatches } from "@/lib/search";
-import type { Articulo } from "@/lib/articulos/types";
 import {
   facturaFromRow,
   totalFactura,
@@ -21,13 +21,11 @@ const LABEL = "text-xs font-semibold text-ink-soft";
 export default function FacturasCompraTab({
   proveedores,
   facturas,
-  articulos,
   onProveedorCreado,
   onFacturaCreada,
 }: {
   proveedores: Proveedor[];
   facturas: FacturaCompra[];
-  articulos: Articulo[];
   onProveedorCreado: (p: Proveedor) => void;
   onFacturaCreada: (f: FacturaCompra) => void;
 }) {
@@ -374,11 +372,7 @@ export default function FacturasCompraTab({
       )}
 
       {recepcion && (
-        <RecepcionModal
-          facturaId={recepcion.facturaId}
-          articulos={articulos}
-          onClose={() => setRecepcion(null)}
-        />
+        <RecepcionModal facturaId={recepcion.facturaId} onClose={() => setRecepcion(null)} />
       )}
     </div>
   );
@@ -451,24 +445,12 @@ function NuevoProveedorModal({
   );
 }
 
-function RecepcionModal({
-  facturaId,
-  articulos,
-  onClose,
-}: {
-  facturaId: string;
-  articulos: Articulo[];
-  onClose: () => void;
-}) {
+function RecepcionModal({ facturaId, onClose }: { facturaId: string; onClose: () => void }) {
   const [items, setItems] = useState<{ codigo: string; cantidad: number }[]>([]);
   const [term, setTerm] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const suggestions = useMemo(() => {
-    const q = term.trim().toLowerCase();
-    if (q.length < 2) return [];
-    return articulos.filter((a) => articleMatches(a, q)).slice(0, 5);
-  }, [term, articulos]);
+  const suggestions = useBuscadorArticulos(term, 5);
 
   function addItem(codigo: string) {
     setItems((prev) => {
@@ -485,8 +467,9 @@ function RecepcionModal({
     await supabase.from("factura_compra_items").insert(
       items.map((i) => ({ factura_id: facturaId, codigo: i.codigo, cantidad: i.cantidad })),
     );
+    const arts = await buscarArticulosPorCodigos(supabase, items.map((i) => i.codigo));
     for (const it of items) {
-      const art = articulos.find((a) => a.codigo === it.codigo);
+      const art = arts.find((a) => a.codigo === it.codigo);
       if (art) await supabase.rpc("devolver_stock", { p_articulo_id: art.id, p_cantidad: it.cantidad });
     }
     setSaving(false);

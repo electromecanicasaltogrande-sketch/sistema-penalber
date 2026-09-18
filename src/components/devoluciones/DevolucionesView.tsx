@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { articleMatches } from "@/lib/search";
+import { useBuscadorArticulos } from "@/lib/articulos/useBuscadorArticulos";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
 import type { Articulo } from "@/lib/articulos/types";
@@ -27,15 +27,12 @@ const FIELD =
 const LABEL = "text-xs font-semibold text-ink-soft";
 
 export default function DevolucionesView({
-  initialArticulos,
   initialClientes,
   initialDevoluciones,
 }: {
-  initialArticulos: Articulo[];
   initialClientes: Cliente[];
   initialDevoluciones: DevolucionRow[];
 }) {
-  const [articulos, setArticulos] = useState(initialArticulos);
   const [clientes] = useState(initialClientes);
   const [historial, setHistorial] = useState(initialDevoluciones);
 
@@ -83,17 +80,8 @@ export default function DevolucionesView({
     return clientes.filter((c) => c.razonSocial.toLowerCase().includes(q)).slice(0, 6);
   }, [clienteSearch, clientes]);
 
-  const devSuggestions = useMemo(() => {
-    const q = devTerm.trim().toLowerCase();
-    if (q.length < 2) return [];
-    return articulos.filter((a) => articleMatches(a, q)).slice(0, 5);
-  }, [devTerm, articulos]);
-
-  const nuevoSuggestions = useMemo(() => {
-    const q = nuevoTerm.trim().toLowerCase();
-    if (q.length < 2) return [];
-    return articulos.filter((a) => articleMatches(a, q)).slice(0, 5);
-  }, [nuevoTerm, articulos]);
+  const devSuggestions = useBuscadorArticulos(devTerm, 5);
+  const nuevoSuggestions = useBuscadorArticulos(nuevoTerm, 5);
 
   const montoDevuelto = devArt ? devArt.precioMinorista * (Number(devCantidad) || 0) : 0;
   const montoNuevo = esCambio && nuevoArt ? nuevoArt.precioMinorista * (Number(nuevoCantidad) || 0) : 0;
@@ -117,13 +105,6 @@ export default function DevolucionesView({
       if (esCambio && nuevoArt) {
         await supabase.rpc("descontar_stock", { p_articulo_id: nuevoArt.id, p_cantidad: Number(nuevoCantidad) || 0 });
       }
-      setArticulos((prev) =>
-        prev.map((a) => {
-          if (a.id === devArt.id) return { ...a, stock: a.stock + (Number(devCantidad) || 0) };
-          if (esCambio && nuevoArt && a.id === nuevoArt.id) return { ...a, stock: a.stock - (Number(nuevoCantidad) || 0) };
-          return a;
-        }),
-      );
 
       if (condicion === "efectivo") {
         await supabase.from("caja_ajustes").insert({
