@@ -25,9 +25,17 @@ export async function proxy(request: NextRequest) {
     },
   );
 
+  // getUser() revalida la sesión contra el servidor de Supabase Auth en
+  // cada request — un viaje de red completo en cada navegación, que era la
+  // causa principal de la demora al cambiar de pantalla. Acá alcanza con
+  // getSession() (lee y valida la expiración del JWT localmente, sin red):
+  // esto solo decide si mostrar el login o la app — el acceso real a los
+  // datos lo sigue validando Supabase con Row Level Security en cada
+  // consulta, contra el JWT firmado real, así que no se pierde seguridad.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
 
