@@ -2,22 +2,14 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
-import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
 import type { Articulo } from "@/lib/articulos/types";
+import { useImportJob, type FilaImportJob } from "@/lib/import/ImportJobContext";
 
-interface FilaImport {
-  codigo: string;
-  descripcion: string;
+interface FilaImport extends FilaImportJob {
   costoConDescuento: number;
-  costo: number;
-  marca: string;
   modelo: string;
   medida: string;
-  rubro: string;
-  precioVenta: number;
-  iva: number;
-  existe: boolean;
 }
 
 // El precio de venta se actualiza siempre (aunque no cambie) en los artículos
@@ -93,32 +85,31 @@ function tieneEncabezado(primeraFila: unknown[]): boolean {
   return coincidencias >= 2;
 }
 
-export default function ImportarExcelTab({
-  articulos,
-  onImportado,
-}: {
-  articulos: Articulo[];
-  onImportado: () => void;
-}) {
+export default function ImportarExcelTab({ articulos }: { articulos: Articulo[] }) {
+  const { iniciar } = useImportJob();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [filas, setFilas] = useState<FilaImport[]>([]);
   const [columnasDetectadas, setColumnasDetectadas] = useState<string[]>([]);
   const [campos, setCampos] = useState<Set<string>>(new Set(CAMPOS.map((c) => c.id)));
   const [leyendo, setLeyendo] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [resultado, setResultado] = useState<{ nuevos: number; actualizados: number } | null>(null);
   const [error, setError] = useState("");
+  const [encolado, setEncolado] = useState(false);
+
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [hojaSeleccionada, setHojaSeleccionada] = useState("Hoja1");
+  const [modalHojaAbierto, setModalHojaAbierto] = useState(false);
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     setArchivo(file ?? null);
     setError("");
-    setResultado(null);
+    setEncolado(false);
     setFilas([]);
     setColumnasDetectadas([]);
+    setWorkbook(null);
   }
 
-  function cargarLista() {
+  function abrirSelectorDeHoja() {
     if (!archivo) {
       setError("Elegí primero un archivo .xlsx.");
       return;
@@ -134,74 +125,86 @@ export default function ImportarExcelTab({
       try {
         const data = ev.target?.result;
         const wb = XLSX.read(data, { type: "array" });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const crudas: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        const noVacias = crudas.filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
-
-        if (noVacias.length === 0) {
-          setLeyendo(false);
-          setError("El archivo no tiene filas de datos.");
-          return;
-        }
-
-        const conEncabezado = tieneEncabezado(noVacias[0]);
-        let rows: Record<string, unknown>[];
-
-        if (conEncabezado) {
-          const headers = noVacias[0].map((h) => String(h ?? "").trim());
-          rows = noVacias.slice(1).map((r) => {
-            const obj: Record<string, unknown> = {};
-            headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
-            return obj;
-          });
-          setColumnasDetectadas(headers);
-        } else {
-          rows = noVacias.map((r) => {
-            const obj: Record<string, unknown> = {};
-            ORDEN_POSICIONAL.forEach((campo, i) => (obj[campo] = r[i] ?? ""));
-            return obj;
-          });
-          setColumnasDetectadas([
-            `Sin fila de encabezado — se usó el orden fijo: ${ORDEN_POSICIONAL.join(", ")}`,
-          ]);
-        }
-
-        const codigosExistentes = new Set(articulos.map((a) => a.codigo.toLowerCase()));
-        const parsed: FilaImport[] = rows
-          .map((r) => {
-            const codigo = String(buscarValor(r, "CODIGO") ?? "").trim();
-            return {
-              codigo,
-              descripcion: String(buscarValor(r, "DESCRIPCION") ?? "").trim(),
-              costoConDescuento: Number(buscarValor(r, "COSTO CON DESCUENTO")) || 0,
-              costo: Number(buscarValor(r, "COSTO")) || 0,
-              marca: String(buscarValor(r, "MARCA") ?? "").trim(),
-              modelo: String(buscarValor(r, "MODELO") ?? "").trim(),
-              medida: String(buscarValor(r, "MEDIDA") ?? "").trim(),
-              rubro: String(buscarValor(r, "RUBRO") ?? "").trim(),
-              precioVenta: Number(buscarValor(r, "PRECIO VENTA")) || 0,
-              iva: Number(buscarValor(r, "IVA")) || 21,
-              existe: codigosExistentes.has(codigo.toLowerCase()),
-            };
-          })
-          .filter((f) => f.codigo);
-
         setLeyendo(false);
-        if (parsed.length === 0) {
-          setError(
-            conEncabezado
-              ? "Se leyó el archivo pero ninguna fila tiene código. Revisá que exista la columna CODIGO."
-              : "Se leyó el archivo pero ninguna fila tiene código en la primera columna.",
-          );
-          return;
-        }
-        setFilas(parsed);
+        setWorkbook(wb);
+        setHojaSeleccionada(wb.SheetNames.includes("Hoja1") ? "Hoja1" : wb.SheetNames[0]);
+        setModalHojaAbierto(true);
       } catch {
         setLeyendo(false);
-        setError("No se pudo leer el archivo. Verificá que sea un .xlsx válido.");
+        setError("No se pudo leer el archivo. Verificá que sea un .xlsx o .xls válido.");
       }
     };
     reader.readAsArrayBuffer(archivo);
+  }
+
+  function procesarHojaSeleccionada() {
+    if (!workbook) return;
+    const sheet = workbook.Sheets[hojaSeleccionada];
+    if (!sheet) {
+      setError(`No se encontró la hoja "${hojaSeleccionada}" en el archivo.`);
+      return;
+    }
+
+    const crudas: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    const noVacias = crudas.filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
+
+    if (noVacias.length === 0) {
+      setError(`La hoja "${hojaSeleccionada}" no tiene filas de datos.`);
+      setModalHojaAbierto(false);
+      return;
+    }
+
+    const conEncabezado = tieneEncabezado(noVacias[0]);
+    let rows: Record<string, unknown>[];
+
+    if (conEncabezado) {
+      const headers = noVacias[0].map((h) => String(h ?? "").trim());
+      rows = noVacias.slice(1).map((r) => {
+        const obj: Record<string, unknown> = {};
+        headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
+        return obj;
+      });
+      setColumnasDetectadas(headers);
+    } else {
+      rows = noVacias.map((r) => {
+        const obj: Record<string, unknown> = {};
+        ORDEN_POSICIONAL.forEach((campo, i) => (obj[campo] = r[i] ?? ""));
+        return obj;
+      });
+      setColumnasDetectadas([`Sin fila de encabezado — se usó el orden fijo: ${ORDEN_POSICIONAL.join(", ")}`]);
+    }
+
+    const codigosExistentes = new Set(articulos.map((a) => a.codigo.toLowerCase()));
+    const parsed: FilaImport[] = rows
+      .map((r) => {
+        const codigo = String(buscarValor(r, "CODIGO") ?? "").trim();
+        return {
+          codigo,
+          descripcion: String(buscarValor(r, "DESCRIPCION") ?? "").trim(),
+          costoConDescuento: Number(buscarValor(r, "COSTO CON DESCUENTO")) || 0,
+          costo: Number(buscarValor(r, "COSTO")) || 0,
+          marca: String(buscarValor(r, "MARCA") ?? "").trim(),
+          modelo: String(buscarValor(r, "MODELO") ?? "").trim(),
+          medida: String(buscarValor(r, "MEDIDA") ?? "").trim(),
+          rubro: String(buscarValor(r, "RUBRO") ?? "").trim(),
+          precioVenta: Number(buscarValor(r, "PRECIO VENTA")) || 0,
+          iva: Number(buscarValor(r, "IVA")) || 21,
+          existe: codigosExistentes.has(codigo.toLowerCase()),
+        };
+      })
+      .filter((f) => f.codigo);
+
+    setModalHojaAbierto(false);
+    setError("");
+    if (parsed.length === 0) {
+      setError(
+        conEncabezado
+          ? `Se leyó la hoja "${hojaSeleccionada}" pero ninguna fila tiene código. Revisá que exista la columna CODIGO.`
+          : `Se leyó la hoja "${hojaSeleccionada}" pero ninguna fila tiene código en la primera columna.`,
+      );
+      return;
+    }
+    setFilas(parsed);
   }
 
   function toggleCampo(id: string) {
@@ -213,53 +216,20 @@ export default function ImportarExcelTab({
     });
   }
 
-  async function confirmarImportacion() {
-    setImporting(true);
-    const supabase = createClient();
-    let nuevos = 0;
-    let actualizados = 0;
-
-    for (const f of filas) {
-      if (f.existe) {
-        // El precio de venta se pisa siempre; la foto nunca se toca acá.
-        const patch: Record<string, unknown> = { precio_minorista: f.precioVenta };
-        if (campos.has("descripcion")) patch.descripcion = f.descripcion;
-        if (campos.has("marca")) patch.marca = f.marca;
-        if (campos.has("rubro")) patch.rubro = f.rubro;
-        if (campos.has("costo")) patch.costo = f.costo;
-        if (campos.has("iva")) patch.iva = f.iva;
-        await supabase.from("articulos").update(patch).ilike("codigo", f.codigo);
-        actualizados++;
-      } else {
-        await supabase.from("articulos").insert({
-          codigo: f.codigo,
-          descripcion: f.descripcion,
-          marca: f.marca,
-          rubro: f.rubro || "Sin rubro",
-          costo: f.costo,
-          iva: f.iva,
-          precio_minorista: f.precioVenta,
-          precio_mayorista: Math.round(f.precioVenta * 0.85),
-          stock: 0,
-          stock_minimo: 5,
-        });
-        nuevos++;
-      }
-    }
-
-    setImporting(false);
-    setResultado({ nuevos, actualizados });
+  function confirmarImportacion() {
+    iniciar(archivo?.name ?? "archivo", hojaSeleccionada, filas, campos);
+    setEncolado(true);
     setFilas([]);
     setArchivo(null);
-    onImportado();
+    setColumnasDetectadas([]);
   }
 
   return (
     <div>
       <div className="mb-4 rounded-[var(--radius-app)] border border-border bg-surface p-4">
         <p className="mb-2 text-sm text-ink-soft">
-          Columnas esperadas (en cualquier orden): <b>CODIGO, DESCRIPCION, COSTO CON DESCUENTO, COSTO, MARCA,
-          MODELO, MEDIDA, RUBRO, PRECIO VENTA, IVA</b>.
+          Columnas esperadas (en cualquier orden, o sin encabezado en este orden fijo): <b>CODIGO,
+          DESCRIPCION, COSTO CON DESCUENTO, COSTO, MARCA, MODELO, MEDIDA, RUBRO, PRECIO VENTA, IVA</b>.
         </p>
         <div className="flex flex-wrap items-center gap-2.5">
           <input
@@ -269,7 +239,7 @@ export default function ImportarExcelTab({
             className="text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-bg file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink-soft"
           />
           <button
-            onClick={cargarLista}
+            onClick={abrirSelectorDeHoja}
             disabled={!archivo || leyendo}
             className="rounded-lg bg-copper px-4 py-2 text-sm font-semibold text-white hover:bg-copper-dark disabled:opacity-40"
           >
@@ -282,9 +252,10 @@ export default function ImportarExcelTab({
             Columnas detectadas en el archivo: {columnasDetectadas.join(", ")}
           </p>
         )}
-        {resultado && (
+        {encolado && (
           <p className="mt-2 rounded-lg bg-success-soft px-3 py-2 text-xs font-medium text-success">
-            Importación completa: {resultado.nuevos} nuevos, {resultado.actualizados} actualizados.
+            La importación se está procesando en segundo plano — mirá el progreso abajo a la izquierda.
+            Podés seguir usando el sistema mientras tanto.
           </p>
         )}
       </div>
@@ -349,12 +320,47 @@ export default function ImportarExcelTab({
 
           <button
             onClick={confirmarImportacion}
-            disabled={importing}
-            className="rounded-lg bg-copper px-5 py-2.5 text-sm font-semibold text-white hover:bg-copper-dark disabled:opacity-60"
+            className="rounded-lg bg-copper px-5 py-2.5 text-sm font-semibold text-white hover:bg-copper-dark"
           >
-            {importing ? "Importando…" : `Confirmar importación (${filas.length} artículos)`}
+            Confirmar importación ({filas.length} artículos)
           </button>
         </>
+      )}
+
+      {modalHojaAbierto && workbook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-[var(--radius-app)] border border-border bg-surface p-5 shadow-lg">
+            <p className="mb-1 text-sm font-semibold text-ink">¿Qué hoja del Excel querés cargar?</p>
+            <p className="mb-3 text-xs text-ink-faint">
+              El archivo tiene {workbook.SheetNames.length} hoja(s). Por defecto se usa &quot;Hoja1&quot;.
+            </p>
+            <select
+              value={hojaSeleccionada}
+              onChange={(e) => setHojaSeleccionada(e.target.value)}
+              className="mb-4 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper"
+            >
+              {workbook.SheetNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2.5">
+              <button
+                onClick={() => setModalHojaAbierto(false)}
+                className="rounded-lg border border-border px-3.5 py-2 text-sm text-ink-soft hover:bg-bg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={procesarHojaSeleccionada}
+                className="rounded-lg bg-copper px-4 py-2 text-sm font-semibold text-white hover:bg-copper-dark"
+              >
+                Cargar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -19,7 +19,7 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
   const [articulos, setArticulos] = useState(initialArticulos);
   const [search, setSearch] = useState("");
   const [selectedRubros, setSelectedRubros] = useState<string[]>([]);
-  const [rubroOpen, setRubroOpen] = useState(false);
+  const [selectedMarcas, setSelectedMarcas] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [selected, setSelected] = useState<string[]>([]);
@@ -28,7 +28,6 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
   );
   const [zoomed, setZoomed] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
-  const rubroBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -58,16 +57,6 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
   }, []);
 
   useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (rubroBoxRef.current && !rubroBoxRef.current.contains(e.target as Node)) {
-        setRubroOpen(false);
-      }
-    }
-    document.addEventListener("click", onClickOutside);
-    return () => document.removeEventListener("click", onClickOutside);
-  }, []);
-
-  useEffect(() => {
     if (!printing) return;
     const after = () => setPrinting(false);
     window.addEventListener("afterprint", after);
@@ -82,13 +71,18 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
     () => [...new Set(articulos.map((a) => a.rubro))].sort(),
     [articulos],
   );
+  const marcas = useMemo(
+    () => [...new Set(articulos.map((a) => a.marca).filter(Boolean))].sort(),
+    [articulos],
+  );
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     let list = articulos.filter((a) => {
       const matchQ = !q || articleMatches(a, q);
       const matchR = selectedRubros.length === 0 || selectedRubros.includes(a.rubro);
-      return matchQ && matchR;
+      const matchM = selectedMarcas.length === 0 || selectedMarcas.includes(a.marca);
+      return matchQ && matchR && matchM;
     });
     if (sortField === "codigo") {
       list = [...list].sort(
@@ -98,7 +92,7 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
       list = [...list].sort((a, b) => sortDir * (a.stock - b.stock));
     }
     return list;
-  }, [articulos, search, selectedRubros, sortField, sortDir]);
+  }, [articulos, search, selectedRubros, selectedMarcas, sortField, sortDir]);
 
   function toggleSort(field: "codigo" | "stock") {
     if (sortField !== field) {
@@ -113,6 +107,10 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
 
   function toggleRubro(r: string) {
     setSelectedRubros((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]));
+  }
+
+  function toggleMarca(m: string) {
+    setSelectedMarcas((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
   }
 
   function toggleSelect(codigo: string, checked: boolean) {
@@ -141,37 +139,19 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
           className="min-w-[260px] flex-1 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper"
         />
 
-        <div className="relative" ref={rubroBoxRef}>
-          <button
-            onClick={() => setRubroOpen((v) => !v)}
-            className="rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-ink-soft hover:bg-bg"
-          >
-            {selectedRubros.length === 0
-              ? "Rubros: Todos"
-              : `Rubros: ${selectedRubros.length} seleccionado(s)`}{" "}
-            ▾
-          </button>
-          {rubroOpen && (
-            <div className="absolute left-0 top-full z-20 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1.5 shadow-md">
-              {rubros.map((r) => (
-                <label
-                  key={r}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-bg"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedRubros.includes(r)}
-                    onChange={() => toggleRubro(r)}
-                  />
-                  {r}
-                </label>
-              ))}
-              {rubros.length === 0 && (
-                <p className="px-2 py-1.5 text-xs text-ink-faint">Sin rubros todavía</p>
-              )}
-            </div>
-          )}
-        </div>
+        <FiltroMultiple
+          label="Marcas"
+          opciones={marcas}
+          seleccion={selectedMarcas}
+          onToggle={toggleMarca}
+        />
+
+        <FiltroMultiple
+          label="Rubros"
+          opciones={rubros}
+          seleccion={selectedRubros}
+          onToggle={toggleRubro}
+        />
 
         <button
           disabled={selected.length === 0}
@@ -335,6 +315,66 @@ export default function ArticulosView({ initialArticulos }: { initialArticulos: 
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FiltroMultiple({
+  label,
+  opciones,
+  seleccion,
+  onToggle,
+}: {
+  label: string;
+  opciones: string[];
+  seleccion: string[];
+  onToggle: (valor: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("click", onClickOutside);
+    return () => document.removeEventListener("click", onClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-ink-soft hover:bg-bg"
+      >
+        {seleccion.length === 0 ? `${label}: Todos` : `${label}: ${seleccion.length} seleccionado(s)`} ▾
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1.5 max-h-64 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1.5 shadow-md">
+          {seleccion.length > 0 && (
+            <button
+              onClick={() => seleccion.forEach((v) => onToggle(v))}
+              className="mb-1 w-full rounded-md px-2 py-1 text-left text-xs font-semibold text-copper hover:bg-bg"
+            >
+              Limpiar selección
+            </button>
+          )}
+          {opciones.map((o) => (
+            <label
+              key={o}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-bg"
+            >
+              <input type="checkbox" checked={seleccion.includes(o)} onChange={() => onToggle(o)} />
+              {o}
+            </label>
+          ))}
+          {opciones.length === 0 && (
+            <p className="px-2 py-1.5 text-xs text-ink-faint">Sin {label.toLowerCase()} todavía</p>
+          )}
         </div>
       )}
     </div>
