@@ -34,7 +34,6 @@ export default function ClienteFicha({
   onUpdated: (c: Cliente) => void;
 }) {
   const [tab, setTab] = useState<Tab>("deuda");
-  const [expanded, setExpanded] = useState(false);
   const [comps, setComps] = useState<CtaCteComprobante[]>([]);
   const [loading, setLoading] = useState(true);
   const [empresaFiltro, setEmpresaFiltro] = useState("");
@@ -288,23 +287,14 @@ export default function ClienteFicha({
 
   return (
     <div className="rounded-[var(--radius-app)] border border-border bg-surface p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-ink">
-            {cliente.razonSocial}
-          </h2>
-          <p className="text-xs text-ink-faint">{cliente.cuit || "Sin CUIT cargado"}</p>
-        </div>
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          title={expanded ? "Achicar detalle" : "Agrandar detalle"}
-          className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft hover:bg-bg"
-        >
-          {expanded ? "⤡ Achicar" : "⤢ Agrandar"}
-        </button>
+      <div>
+        <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-ink">
+          {cliente.razonSocial}
+        </h2>
+        <p className="text-xs text-ink-faint">{cliente.cuit || "Sin CUIT cargado"}</p>
       </div>
 
-      <div style={{ zoom: expanded ? 1 : 0.85 }}>
+      <div>
       <div className="mt-4 flex gap-1 border-b border-border">
         {(
           [

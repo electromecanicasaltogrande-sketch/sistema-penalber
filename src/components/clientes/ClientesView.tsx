@@ -45,7 +45,7 @@ export default function ClientesView({ initialClientes }: { initialClientes: Cli
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
-      <div>
+      <div className="flex flex-col lg:sticky lg:top-[90px] lg:h-[calc(100vh-110px)]">
         <div className="mb-3 flex gap-2">
           <input
             value={search}
@@ -60,7 +60,7 @@ export default function ClientesView({ initialClientes }: { initialClientes: Cli
         >
           + Nuevo cliente
         </button>
-        <div className="flex flex-col gap-1 rounded-[var(--radius-app)] border border-border bg-surface p-1.5">
+        <div className="flex flex-1 flex-col gap-1 overflow-y-auto rounded-[var(--radius-app)] border border-border bg-surface p-1.5">
           {filtrados.map((c) => (
             <button
               key={c.id}

@@ -6,8 +6,9 @@ import FacturasCompraTab from "./FacturasCompraTab";
 import ReportePagosTab from "./ReportePagosTab";
 import AgregarProductoTab from "./AgregarProductoTab";
 import ImportarExcelTab from "./ImportarExcelTab";
+import ProveedoresDetalleTab from "./ProveedoresDetalleTab";
 
-type Tab = "facturas" | "reporte" | "agregar" | "importar";
+type Tab = "proveedores" | "facturas" | "reporte" | "agregar" | "importar";
 
 export default function ProveedoresView({
   initialProveedores,
@@ -16,7 +17,7 @@ export default function ProveedoresView({
   initialProveedores: Proveedor[];
   initialFacturas: FacturaCompra[];
 }) {
-  const [tab, setTab] = useState<Tab>("facturas");
+  const [tab, setTab] = useState<Tab>("proveedores");
   const [proveedores, setProveedores] = useState(initialProveedores);
   const [facturas, setFacturas] = useState(initialFacturas);
 
@@ -25,6 +26,7 @@ export default function ProveedoresView({
       <div className="mb-4 flex gap-1 border-b border-border">
         {(
           [
+            ["proveedores", "Proveedores"],
             ["facturas", "Facturas de compra"],
             ["reporte", "Reporte / Pagos"],
             ["agregar", "Agregar producto"],
@@ -43,6 +45,14 @@ export default function ProveedoresView({
         ))}
       </div>
 
+      {tab === "proveedores" && (
+        <ProveedoresDetalleTab
+          proveedores={proveedores}
+          facturas={facturas}
+          onProveedorUpdated={(p) => setProveedores((prev) => prev.map((x) => (x.id === p.id ? p : x)))}
+          onProveedorDeleted={(id) => setProveedores((prev) => prev.filter((x) => x.id !== id))}
+        />
+      )}
       {tab === "facturas" && (
         <FacturasCompraTab
           proveedores={proveedores}
