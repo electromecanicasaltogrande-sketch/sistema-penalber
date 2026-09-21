@@ -101,13 +101,17 @@ export async function buscarArticuloExacto(
     .maybeSingle();
   if (porBarras) return fromRow(porBarras as unknown as ArticuloRow);
 
+  // El código ya no es único en toda la tabla (dos marcas distintas pueden
+  // compartir el mismo código) — si hay más de un resultado no elegimos
+  // ninguno solo, para no agregar por error el de la marca equivocada; que
+  // el cajero lo elija a mano de la lista de resultados.
   const { data: porCodigo } = await supabase
     .from("articulos")
     .select(COLUMNAS_ARTICULO)
     .ilike("codigo", term)
-    .limit(1)
-    .maybeSingle();
-  if (porCodigo) return fromRow(porCodigo as unknown as ArticuloRow);
+    .limit(2);
+  const filas = (porCodigo as unknown as ArticuloRow[] | null) ?? [];
+  if (filas.length === 1) return fromRow(filas[0]);
 
   return null;
 }
