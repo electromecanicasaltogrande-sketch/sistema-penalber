@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
 import { totalFactura, type FacturaCompra, type Proveedor } from "@/lib/proveedores/types";
+import RecepcionModal from "./RecepcionModal";
 
 const FIELD =
   "w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
@@ -27,6 +28,7 @@ export default function ProveedorFicha({
   const [email, setEmail] = useState(proveedor.email);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [recepcion, setRecepcion] = useState<{ facturaId: string } | null>(null);
 
   useEffect(() => {
     setRazonSocial(proveedor.razonSocial);
@@ -150,19 +152,31 @@ export default function ProveedorFicha({
                   </p>
                   <p className="text-xs text-ink-faint">{f.fechaFactura}</p>
                 </div>
-                <div className="text-right">
-                  <p className="font-mono font-semibold">{money(totalFactura(f))}</p>
-                  <span
-                    className={`text-[11px] font-semibold ${f.pagada ? "text-success" : "text-warning"}`}
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="font-mono font-semibold">{money(totalFactura(f))}</p>
+                    <span
+                      className={`text-[11px] font-semibold ${f.pagada ? "text-success" : "text-warning"}`}
+                    >
+                      {f.pagada ? "Pagada" : "Pendiente"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setRecepcion({ facturaId: f.id })}
+                    className="whitespace-nowrap rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft hover:bg-bg"
                   >
-                    {f.pagada ? "Pagada" : "Pendiente"}
-                  </span>
+                    📦 Cargar artículos
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {recepcion && (
+        <RecepcionModal facturaId={recepcion.facturaId} onClose={() => setRecepcion(null)} />
+      )}
     </div>
   );
 }

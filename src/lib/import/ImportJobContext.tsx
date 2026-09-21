@@ -82,7 +82,11 @@ export function ImportJobProvider({ children }: { children: React.ReactNode }) {
               if (campos.has("rubro")) patch.rubro = f.rubro;
               if (campos.has("costo")) patch.costo = f.costo;
               if (campos.has("iva")) patch.iva = f.iva;
-              const { error } = await supabase.from("articulos").update(patch).ilike("codigo", f.codigo);
+              const { error } = await supabase
+                .from("articulos")
+                .update(patch)
+                .ilike("codigo", f.codigo)
+                .ilike("marca", f.marca);
               if (error) errores++;
               else actualizados++;
             } else {

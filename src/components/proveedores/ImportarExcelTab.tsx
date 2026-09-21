@@ -3,7 +3,7 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
-import { codigosExistentes as buscarCodigosExistentes } from "@/lib/articulos/search";
+import { codigosYMarcasExistentes, claveCodigoMarca } from "@/lib/articulos/search";
 import { money } from "@/lib/format";
 import { useImportJob, type FilaImportJob } from "@/lib/import/ImportJobContext";
 
@@ -203,18 +203,16 @@ export default function ImportarExcelTab() {
 
     // Solo se consultan en la base los códigos que trae este archivo (no el
     // catálogo entero), en tandas — así funciona igual de rápido con 100
-    // filas que con 100.000 artículos ya cargados.
+    // filas que con 100.000 artículos ya cargados. Un código ya cargado con
+    // otra marca no cuenta como "existente": se trata como artículo nuevo.
     setVerificando(true);
     const supabase = createClient();
-    const existentes = await buscarCodigosExistentes(
-      supabase,
-      crudo.map((f) => f.codigo),
-    );
+    const existentes = await codigosYMarcasExistentes(supabase, crudo);
     setVerificando(false);
 
     const parsed: FilaImport[] = crudo.map((f) => ({
       ...f,
-      existe: existentes.has(f.codigo.toLowerCase()),
+      existe: existentes.has(claveCodigoMarca(f.codigo, f.marca)),
     }));
 
     setModalHojaAbierto(false);
@@ -280,7 +278,8 @@ export default function ImportarExcelTab() {
           <div className="mb-4 rounded-[var(--radius-app)] border border-border bg-surface p-4">
             <p className="mb-1 text-sm font-semibold text-ink">¿Qué modificar en caso de artículos ya cargados?</p>
             <p className="mb-2 text-xs text-ink-faint">
-              El precio de venta se actualiza siempre. La foto del artículo nunca se toca desde acá.
+              El precio de venta se actualiza siempre. La foto del artículo nunca se toca desde acá. Un
+              código que ya existe pero con otra marca se carga como artículo nuevo, no pisa al existente.
             </p>
             <div className="mb-2 flex gap-3 text-xs">
               <button onClick={() => setCampos(new Set(CAMPOS.map((c) => c.id)))} className="font-semibold text-copper hover:underline">

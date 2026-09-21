@@ -145,6 +145,34 @@ export async function codigosExistentes(
   return existentes;
 }
 
+function claveCodigoMarca(codigo: string, marca: string): string {
+  return `${codigo.trim().toLowerCase()}::${marca.trim().toLowerCase()}`;
+}
+
+// Igual que codigosExistentes, pero para decidir en una importación si una
+// fila "actualiza" un artículo ya cargado o crea uno nuevo: solo cuenta como
+// el mismo artículo cuando código Y marca coinciden. Un código repetido con
+// una marca distinta (p.ej. un repuesto genérico que varios proveedores
+// listan con el mismo código pero es de otra marca) se trata como artículo
+// nuevo en vez de pisar al que ya existe.
+export async function codigosYMarcasExistentes(
+  supabase: SupabaseClient<Database>,
+  pares: { codigo: string; marca: string }[],
+): Promise<Set<string>> {
+  const codigosUnicos = [...new Set(pares.map((p) => p.codigo).filter(Boolean))];
+  const existentes = new Set<string>();
+  for (let i = 0; i < codigosUnicos.length; i += TAMANO_TANDA_IN) {
+    const tanda = codigosUnicos.slice(i, i + TAMANO_TANDA_IN);
+    const { data } = await supabase.from("articulos").select("codigo, marca").in("codigo", tanda);
+    for (const row of (data as { codigo: string; marca: string }[] | null) ?? []) {
+      existentes.add(claveCodigoMarca(row.codigo, row.marca));
+    }
+  }
+  return existentes;
+}
+
+export { claveCodigoMarca };
+
 export interface FiltrosArticulos {
   texto?: string;
   rubros?: string[];
