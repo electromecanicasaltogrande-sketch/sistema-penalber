@@ -70,29 +70,35 @@ export default function DatosClienteManual({
         </p>
 
         <div className="mt-4 flex flex-col gap-3">
-          <div className="grid grid-cols-[130px_1fr] gap-2">
-            <div className="flex flex-col gap-1">
-              <label className={LABEL}>Documento</label>
-              <select className={FIELD} value={tipoDoc} onChange={(e) => cambiarTipo(e.target.value as TipoDoc)}>
-                {TIPOS_DOC.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+          <div className="flex flex-col gap-1">
+            <label className={LABEL}>Tipo de documento</label>
+            <div className="flex flex-wrap gap-1.5">
+              {TIPOS_DOC.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => cambiarTipo(t.id)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                    tipoDoc === t.id ? "border-copper bg-copper text-white" : "border-border bg-bg text-ink-soft hover:bg-surface"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
+          </div>
+          {tipoDoc !== "SIN" && (
             <div className="flex flex-col gap-1">
-              <label className={LABEL}>Número</label>
+              <label className={LABEL}>Número (sin puntos ni guiones)</label>
               <input
                 className={FIELD}
                 value={numero}
-                disabled={tipoDoc === "SIN"}
-                onChange={(e) => setNumero(e.target.value)}
-                placeholder={tipoDoc === "DNI" ? "Sin puntos" : "Sin guiones"}
+                onChange={(e) => setNumero(e.target.value.replace(/D/g, "").slice(0, 11))}
+                placeholder={tipoDoc === "DNI" ? "Ej: 30123456" : "Ej: 20301234567"}
                 inputMode="numeric"
               />
             </div>
-          </div>
+          )}
 
           <div className="flex flex-col gap-1">
             <label className={LABEL}>Razón social / Nombre y apellido</label>
@@ -101,13 +107,20 @@ export default function DatosClienteManual({
 
           <div className="flex flex-col gap-1">
             <label className={LABEL}>Condición frente al IVA</label>
-            <select className={FIELD} value={condicionIva} onChange={(e) => setCondicionIva(e.target.value)}>
+            <div className="flex flex-wrap gap-1.5">
               {CONDICIONES_IVA.map((c) => (
-                <option key={c.id} value={c.id}>
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCondicionIva(c.id)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                    condicionIva === c.id ? "border-copper bg-copper text-white" : "border-border bg-bg text-ink-soft hover:bg-surface"
+                  }`}
+                >
                   {c.label}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
