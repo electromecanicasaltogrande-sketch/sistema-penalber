@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
 import { empresaCorta } from "@/lib/empresas";
@@ -8,6 +8,10 @@ import { buildComprobanteDoc, eliminarVenta, type VentaRow } from "@/lib/ventas/
 import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
 
 type TipoFiltro = "" | "factura" | "remito" | "nc";
+
+const PAGINA = 300;
+const COLUMNAS =
+  "id, numero, tipo, doc_type, empresa_cuit, cliente_id, cliente_nombre, dni, condicion_pago, subtotal, descuento, total, discrimina_iva, cae, cae_vencimiento, creado_en, cliente_tipo_doc, cliente_domicilio, cliente_localidad, cliente_condicion_iva";
 
 const FIELD =
   "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-copper focus:ring-1 focus:ring-copper";
@@ -26,6 +30,43 @@ export default function HistorialView({
   const [tipo, setTipo] = useState<TipoFiltro>("");
   const [printDoc, setPrintDoc] = useState<ComprobanteDocData | null>(null);
   const [borrando, setBorrando] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [hayMas, setHayMas] = useState(initialVentas.length >= PAGINA);
+  const hayFiltros = !!(cliente.trim() || desde || hasta || tipo);
+
+  // Los filtros se aplican en la base (no solo sobre las últimas filas ya
+  // cargadas), así se puede buscar en todo el historial.
+  async function cargar(desdeFila: number, reemplazar: boolean) {
+    setCargando(true);
+    const supabase = createClient();
+    let q = supabase
+      .from("ventas")
+      .select(COLUMNAS)
+      .order("creado_en", { ascending: false })
+      .range(desdeFila, desdeFila + PAGINA - 1);
+    if (cliente.trim()) q = q.ilike("cliente_nombre", `%${cliente.trim().replace(/[%_]/g, (m) => "\\" + m)}%`);
+    if (desde) q = q.gte("creado_en", desde + "T00:00:00-03:00");
+    if (hasta) q = q.lte("creado_en", hasta + "T23:59:59-03:00");
+    if (tipo === "factura") q = q.in("doc_type", ["factura_a", "factura_b", "factura_c"]);
+    if (tipo === "remito") q = q.eq("doc_type", "remito_r");
+    if (tipo === "nc") q = q.in("doc_type", ["nc_a", "nc_b"]);
+    const { data } = await q;
+    const filas = (data as VentaRow[] | null) ?? [];
+    setVentas((prev) => (reemplazar ? filas : [...prev, ...filas]));
+    setHayMas(filas.length === PAGINA);
+    setCargando(false);
+  }
+
+  useEffect(() => {
+    if (!hayFiltros) {
+      setVentas(initialVentas);
+      setHayMas(initialVentas.length >= PAGINA);
+      return;
+    }
+    const h = setTimeout(() => cargar(0, true), 300);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente, desde, hasta, tipo]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -44,18 +85,7 @@ export default function HistorialView({
     };
   }, []);
 
-  const filtradas = useMemo(() => {
-    const q = cliente.toLowerCase();
-    return ventas.filter((v) => {
-      if (q && !v.cliente_nombre.toLowerCase().includes(q)) return false;
-      if (desde && v.creado_en.slice(0, 10) < desde) return false;
-      if (hasta && v.creado_en.slice(0, 10) > hasta) return false;
-      if (tipo === "factura" && !v.doc_type.startsWith("factura")) return false;
-      if (tipo === "remito" && v.doc_type !== "remito_r") return false;
-      if (tipo === "nc" && !v.doc_type.startsWith("nc_")) return false;
-      return true;
-    });
-  }, [ventas, cliente, desde, hasta, tipo]);
+  const filtradas = ventas;
 
   async function verImprimir(v: VentaRow) {
     setPrintDoc(await buildComprobanteDoc(v));
@@ -146,6 +176,18 @@ export default function HistorialView({
           </p>
         )}
       </div>
+
+      {hayMas && (
+        <div className="mt-3 text-center">
+          <button
+            onClick={() => cargar(ventas.length, false)}
+            disabled={cargando}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink-soft hover:bg-bg disabled:opacity-50"
+          >
+            {cargando ? "Cargando…" : "Cargar más comprobantes"}
+          </button>
+        </div>
+      )}
 
       {printDoc && <ComprobantePrint doc={printDoc} onClose={() => setPrintDoc(null)} />}
     </div>
