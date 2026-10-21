@@ -7,11 +7,13 @@ import { buscarArticulosPorCodigos } from "@/lib/articulos/search";
 import type { Articulo } from "@/lib/articulos/types";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
-import type { Cliente } from "@/lib/clientes/types";
+import { clienteFromRow, type Cliente, type ClienteRow } from "@/lib/clientes/types";
+import { CONDICIONES_IVA, TIPOS_DOC, formatearCuit, type DatosManuales } from "@/lib/clientes/documento";
 import { DOC_LABELS, FORMAS_PAGO, type CartItem, type CondicionPago, type DocType } from "@/lib/ventas/types";
 import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
 import ChequeModal, { type ChequeData } from "./ChequeModal";
 import BuscadorArticulos from "@/components/articulos/BuscadorArticulos";
+import DatosClienteManual from "./DatosClienteManual";
 
 interface VentaHoy {
   id: string;
@@ -32,7 +34,9 @@ export default function VentasView({
 }: {
   initialClientes: Cliente[];
 }) {
-  const [clientes] = useState(initialClientes);
+  const [clientes, setClientes] = useState(initialClientes);
+  const [datosManuales, setDatosManuales] = useState<DatosManuales | null>(null);
+  const [showManualCliente, setShowManualCliente] = useState(false);
 
   const [entryMode, setEntryMode] = useState<"code" | "manual">("code");
 
@@ -102,7 +106,7 @@ export default function VentasView({
 
   function applyConsFinalRules(cliente: Cliente | null, pago: CondicionPago) {
     const esCF = cliente?.esConsumidorFinal ?? true;
-    if (esCF && !isNC) {
+    if (esCF && !isNC && !datosManuales) {
       const target: DocType = pago === "efectivo" ? "remito_r" : "factura_b";
       setDocTypeState(target);
     }
@@ -122,6 +126,36 @@ export default function VentasView({
       setDocTypeState(c.tipoComprobanteDefault as DocType);
     }
     if (isNC) loadNcOptions(c);
+  }
+
+  async function aplicarDatosManuales(d: DatosManuales, guardar: boolean): Promise<string | void> {
+    const condicion = CONDICIONES_IVA.find((c) => c.id === d.condicionIva);
+    const tipoSugerido: DocType = condicion?.facturaA ? "factura_a" : "factura_b";
+    if (guardar) {
+      const supabase = createClient();
+      const { data, error: err } = await supabase
+        .from("clientes")
+        .insert({
+          razon_social: d.razonSocial,
+          cuit: d.tipoDoc === "CUIT" || d.tipoDoc === "CUIL" ? formatearCuit(d.numero) : d.numero,
+          telefono: "",
+          direccion: d.domicilio,
+          localidad: d.localidad,
+          es_consumidor_final: false,
+        })
+        .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default")
+        .single();
+      if (err || !data) return "No se pudo guardar el cliente.";
+      const nuevo = clienteFromRow(data as ClienteRow);
+      setClientes((prev) => [...prev, nuevo]);
+      setDatosManuales(null);
+      selectCliente(nuevo);
+    } else {
+      setDatosManuales(d);
+      setSelectedCliente(null);
+    }
+    if (!isNC) setDocTypeState(tipoSugerido);
+    setShowManualCliente(false);
   }
 
   function changeCondicionPago(pago: CondicionPago) {
@@ -237,7 +271,7 @@ export default function VentasView({
     setError("");
     const supabase = createClient();
     const empresa = EMPRESAS[empresaIdx];
-    const clienteLabel = selectedCliente?.razonSocial ?? "Consumidor Final";
+    const clienteLabel = datosManuales?.razonSocial ?? selectedCliente?.razonSocial ?? "Consumidor Final";
 
     try {
       const { data: n, error: seqErr } = await supabase.rpc("next_comprobante_numero");
@@ -262,7 +296,15 @@ export default function VentasView({
           empresa_cuit: empresa.cuit,
           cliente_id: selectedCliente?.id ?? null,
           cliente_nombre: clienteLabel,
-          dni: dni || null,
+          dni: datosManuales?.numero || dni || null,
+          ...(datosManuales
+            ? {
+                cliente_tipo_doc: datosManuales.tipoDoc,
+                cliente_domicilio: datosManuales.domicilio || null,
+                cliente_localidad: datosManuales.localidad || null,
+                cliente_condicion_iva: datosManuales.condicionIva,
+              }
+            : {}),
           condicion_pago: isNC ? "nc" : condicionPago,
           subtotal,
           descuento,
@@ -341,7 +383,13 @@ export default function VentasView({
         numero,
         empresa,
         clienteNombre: clienteLabel,
-        dni: dni || undefined,
+        dni: datosManuales?.numero || dni || undefined,
+        clienteTipoDoc: datosManuales?.tipoDoc,
+        clienteDomicilio: datosManuales?.domicilio || undefined,
+        clienteLocalidad: datosManuales?.localidad || undefined,
+        clienteCondicionIva: datosManuales
+          ? CONDICIONES_IVA.find((c) => c.id === datosManuales.condicionIva)?.label
+          : undefined,
         condicionPagoLabel: isNC
           ? "Nota de crédito"
           : (FORMAS_PAGO.find((f) => f.id === condicionPago)?.label ?? condicionPago),
@@ -355,6 +403,7 @@ export default function VentasView({
       });
 
       setCart([]);
+      setDatosManuales(null);
       setChequeModal(null);
     } catch {
       setError("No se pudo registrar la venta. Reintentá.");
@@ -531,13 +580,45 @@ export default function VentasView({
               )}
             </div>
           )}
+          {datosManuales && (
+            <div className="mt-2 rounded-lg border border-copper/40 bg-copper-soft px-3 py-2 text-xs">
+              <p className="text-sm font-semibold text-ink">{datosManuales.razonSocial}</p>
+              <p className="text-ink-soft">
+                {TIPOS_DOC.find((t) => t.id === datosManuales.tipoDoc)?.label}
+                {datosManuales.numero ? `: ${datosManuales.numero}` : ""} ·{" "}
+                {CONDICIONES_IVA.find((c) => c.id === datosManuales.condicionIva)?.label}
+              </p>
+              {(datosManuales.domicilio || datosManuales.localidad) && (
+                <p className="text-ink-faint">{[datosManuales.domicilio, datosManuales.localidad].filter(Boolean).join(", ")}</p>
+              )}
+              <div className="mt-1 flex gap-3">
+                <button onClick={() => setShowManualCliente(true)} className="font-semibold text-copper-dark hover:underline">
+                  Editar
+                </button>
+                <button onClick={() => setDatosManuales(null)} className="font-semibold text-danger hover:underline">
+                  Quitar
+                </button>
+              </div>
+            </div>
+          )}
+          {isConsumidorFinal && !datosManuales && (
+            <button
+              onClick={() => setShowManualCliente(true)}
+              className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-ink-soft hover:bg-bg"
+            >
+              ✏️ Cargar datos del cliente a mano (CUIT / DNI)
+            </button>
+          )}
           <button
-            onClick={() => selectCliente(clientes.find((c) => c.esConsumidorFinal) ?? null)}
+            onClick={() => {
+              setDatosManuales(null);
+              selectCliente(clientes.find((c) => c.esConsumidorFinal) ?? null);
+            }}
             className="mt-2 w-full rounded-lg border border-copper/40 bg-copper-soft px-3 py-2 text-sm font-semibold text-copper-dark hover:bg-copper-soft/70"
           >
             ⚡ Consumidor Final
           </button>
-          {isConsumidorFinal && (
+          {isConsumidorFinal && !datosManuales && (
             <input
               value={dni}
               onChange={(e) => setDni(e.target.value)}
@@ -682,6 +763,13 @@ export default function VentasView({
       )}
 
       {printDoc && <ComprobantePrint doc={printDoc} onClose={() => setPrintDoc(null)} />}
+    {showManualCliente && (
+        <DatosClienteManual
+          inicial={datosManuales}
+          onAplicar={aplicarDatosManuales}
+          onCancelar={() => setShowManualCliente(false)}
+        />
+      )}
     </div>
   );
 }

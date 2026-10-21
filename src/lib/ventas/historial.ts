@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { EMPRESAS } from "@/lib/empresas";
+import { CONDICIONES_IVA } from "@/lib/clientes/documento";
 import { FORMAS_PAGO, type CartItem, type DocType } from "./types";
 import type { ComprobanteDocData } from "./print";
 
@@ -20,6 +21,10 @@ export interface VentaRow {
   cae: string | null;
   cae_vencimiento: string | null;
   creado_en: string;
+  cliente_tipo_doc?: string | null;
+  cliente_domicilio?: string | null;
+  cliente_localidad?: string | null;
+  cliente_condicion_iva?: string | null;
 }
 
 // Elimina un comprobante y deshace sus efectos: devuelve el stock que había
@@ -85,6 +90,10 @@ export async function buildComprobanteDoc(venta: VentaRow): Promise<ComprobanteD
     empresa,
     clienteNombre: venta.cliente_nombre,
     dni: venta.dni ?? undefined,
+    clienteTipoDoc: venta.cliente_tipo_doc ?? undefined,
+    clienteDomicilio: venta.cliente_domicilio ?? undefined,
+    clienteLocalidad: venta.cliente_localidad ?? undefined,
+    clienteCondicionIva: CONDICIONES_IVA.find((c) => c.id === venta.cliente_condicion_iva)?.label,
     condicionPagoLabel: venta.condicion_pago === "nc" ? "Nota de crédito" : formaPago,
     items,
     subtotal: Number(venta.subtotal),

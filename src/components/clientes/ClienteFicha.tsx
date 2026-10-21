@@ -47,6 +47,7 @@ export default function ClienteFicha({
   const [seleccionDetalle, setSeleccionDetalle] = useState<Set<string>>(new Set());
   const [detalleCuenta, setDetalleCuenta] = useState<DetalleCuentaData | null>(null);
   const [error, setError] = useState("");
+  const [pagosHist, setPagosHist] = useState<{ id: string; monto: number; forma_pago: string; fecha: string }[]>([]);
 
   // Datos tab
   const [razonSocial, setRazonSocial] = useState(cliente.razonSocial);
@@ -108,6 +109,39 @@ export default function ClienteFicha({
     };
   }, [cliente.id]);
 
+  async function cargarPagos() {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("cta_cte_pagos")
+      .select("id, monto, forma_pago, fecha")
+      .eq("cliente_id", cliente.id)
+      .order("fecha", { ascending: false })
+      .limit(500);
+    setPagosHist(
+      ((data ?? []) as { id: string; monto: number | string; forma_pago: string; fecha: string }[]).map((p) => ({
+        ...p,
+        monto: Number(p.monto),
+      })),
+    );
+  }
+
+  useEffect(() => {
+    cargarPagos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente.id]);
+
+  const opcionesEmpresa = useMemo(
+    () => [
+      { cuit: "", label: "Todas", saldo: comps.filter((c) => !estaPagado(c)).reduce((s, c) => s + saldo(c), 0) },
+      ...EMPRESAS.map((e) => ({
+        cuit: e.cuit,
+        label: e.razonSocial,
+        saldo: comps.filter((c) => c.empresaCuit === e.cuit && !estaPagado(c)).reduce((s, c) => s + saldo(c), 0),
+      })),
+    ],
+    [comps],
+  );
+
   const filtrados = useMemo(() => {
     return comps.filter((cp) => {
       if (empresaFiltro && cp.empresaCuit !== empresaFiltro) return false;
@@ -162,6 +196,7 @@ export default function ClienteFicha({
         return ap ? ap.comprobante : c;
       }),
     );
+    cargarPagos();
   }
 
   async function marcarSeleccionadasPagas() {
@@ -294,6 +329,32 @@ export default function ClienteFicha({
         <p className="text-xs text-ink-faint">{cliente.cuit || "Sin CUIT cargado"}</p>
       </div>
 
+      <div className="mt-4">
+        <p className="mb-1.5 text-xs font-semibold text-ink-soft">Ver cuenta corriente de la razón social</p>
+        <div className="flex flex-wrap gap-2">
+          {opcionesEmpresa.map((o) => (
+            <button
+              key={o.cuit || "todas"}
+              onClick={() => {
+                setEmpresaFiltro(o.cuit);
+                setSeleccionadas([]);
+                setSeleccionDetalle(new Set());
+              }}
+              className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
+                empresaFiltro === o.cuit
+                  ? "border-copper bg-copper-soft text-ink"
+                  : "border-border bg-bg text-ink-soft hover:bg-surface"
+              }`}
+            >
+              <span className="block font-semibold">{o.label}</span>
+              <span className={`font-mono ${o.saldo > 0 ? "text-danger" : "text-ink-faint"}`}>
+                Debe {money(o.saldo)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div>
       <div className="mt-4 flex gap-1 border-b border-border">
         {(
@@ -323,18 +384,6 @@ export default function ClienteFicha({
 
       {(tab === "deuda" || tab === "pago") && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <select
-            value={empresaFiltro}
-            onChange={(e) => setEmpresaFiltro(e.target.value)}
-            className="rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs text-ink-soft"
-          >
-            <option value="">Todas las empresas</option>
-            {EMPRESAS.map((e) => (
-              <option key={e.cuit} value={e.cuit}>
-                {e.razonSocial}
-              </option>
-            ))}
-          </select>
           <input
             type="date"
             value={desde}
@@ -448,6 +497,29 @@ export default function ClienteFicha({
               </div>
             </>
           )}
+
+          <div className="mt-6">
+            <p className="mb-1.5 text-xs font-semibold text-ink-soft">
+              Pagos y notas de crédito registrados ({pagosHist.length})
+            </p>
+            {pagosHist.length === 0 ? (
+              <p className="py-3 text-center text-xs text-ink-faint">Todavía no hay pagos registrados.</p>
+            ) : (
+              <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+                {pagosHist.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-1.5 text-sm"
+                  >
+                    <span className="text-xs text-ink-soft">
+                      {p.fecha} · {p.forma_pago}
+                    </span>
+                    <span className="font-mono font-semibold text-success">{money(p.monto)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -12,6 +12,10 @@ export interface ComprobanteDocData {
   empresa: Empresa;
   clienteNombre: string;
   dni?: string;
+  clienteTipoDoc?: string;
+  clienteDomicilio?: string;
+  clienteLocalidad?: string;
+  clienteCondicionIva?: string;
   condicionPagoLabel: string;
   items: CartItem[];
   subtotal: number;
@@ -62,8 +66,18 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
 
       <div className="border-b line-40 py-2">
         <p>
-          <b>CLIENTE:</b> {doc.clienteNombre} {doc.dni ? `DNI: ${doc.dni}` : ""}
+          <b>CLIENTE:</b> {doc.clienteNombre} {doc.dni ? `${doc.clienteTipoDoc && doc.clienteTipoDoc !== "SIN" ? doc.clienteTipoDoc : "DNI"}: ${doc.dni}` : ""}
         </p>
+        {(doc.clienteDomicilio || doc.clienteLocalidad) && (
+          <p>
+            <b>DOMICILIO:</b> {[doc.clienteDomicilio, doc.clienteLocalidad].filter(Boolean).join(", ")}
+          </p>
+        )}
+        {doc.clienteCondicionIva && (
+          <p>
+            <b>COND. IVA:</b> {doc.clienteCondicionIva}
+          </p>
+        )}
         <p>
           <b>CONDICIÓN:</b> {doc.condicionPagoLabel}
         </p>

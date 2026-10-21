@@ -11,7 +11,7 @@ export default async function HistorialPage() {
     supabase
       .from("ventas")
       .select(
-        "id, numero, tipo, doc_type, empresa_cuit, cliente_id, cliente_nombre, dni, condicion_pago, subtotal, descuento, total, discrimina_iva, cae, cae_vencimiento, creado_en",
+        "id, numero, tipo, doc_type, empresa_cuit, cliente_id, cliente_nombre, dni, condicion_pago, subtotal, descuento, total, discrimina_iva, cae, cae_vencimiento, creado_en, cliente_tipo_doc, cliente_domicilio, cliente_localidad, cliente_condicion_iva",
       )
       .order("creado_en", { ascending: false })
       .limit(300),
