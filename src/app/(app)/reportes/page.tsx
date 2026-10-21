@@ -23,7 +23,7 @@ export default async function ReportesPage() {
         .gte("creado_en", new Date(Date.now() - 400 * 86400000).toISOString())
         .order("creado_en", { ascending: false })
         .order("id")
-        .range(d, h),
+        .range(d, h) as unknown as PromiseLike<{ data: VentaRow[] | null }>,
     ),
     supabase.from("facturas_compra").select("id, tipo_comprobante, neto, iva, otros_impuestos, fecha_factura").order("fecha_factura", { ascending: false }).limit(1000),
     supabase.from("reparaciones").select("id, total, entregada, creado_en").order("creado_en", { ascending: false }).limit(1000),
