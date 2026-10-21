@@ -47,6 +47,7 @@ export default function ClienteFicha({
   const [seleccionDetalle, setSeleccionDetalle] = useState<Set<string>>(new Set());
   const [detalleCuenta, setDetalleCuenta] = useState<DetalleCuentaData | null>(null);
   const [error, setError] = useState("");
+  const [mostrarPagados, setMostrarPagados] = useState(false);
   const [pagosHist, setPagosHist] = useState<{ id: string; monto: number; forma_pago: string; fecha: string }[]>([]);
 
   // Datos tab
@@ -153,6 +154,10 @@ export default function ClienteFicha({
 
   const pendientes = filtrados.filter((cp) => !estaPagado(cp));
   const pagados = filtrados.filter((cp) => estaPagado(cp));
+  const masRecientesPrimero = (a: CtaCteComprobante, b: CtaCteComprobante) =>
+    b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero);
+  const visibles = [...(mostrarPagados ? filtrados : pendientes)].sort(masRecientesPrimero);
+  const pendientesOrdenados = [...pendientes].sort(masRecientesPrimero);
   const saldoPendiente = pendientes.reduce((s, cp) => s + saldo(cp), 0);
   const saldoPagado = pagados.reduce((s, cp) => s + cp.total, 0);
   const seleccionTotal = pendientes
@@ -414,21 +419,29 @@ export default function ClienteFicha({
           </div>
           {loading ? (
             <p className="text-sm text-ink-faint">Cargando…</p>
-          ) : filtrados.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink-faint">Sin comprobantes para este filtro.</p>
+          ) : visibles.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-faint">
+              {mostrarPagados ? "Sin comprobantes para este filtro." : "No tiene comprobantes pendientes en este filtro."}
+            </p>
           ) : (
             <>
               <div className="mb-2 flex items-center justify-between">
+                <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-1.5 text-xs text-ink-soft">
+                  <input type="checkbox" checked={mostrarPagados} onChange={(e) => setMostrarPagados(e.target.checked)} />
+                  Mostrar también los ya pagados
+                </label>
                 <label className="flex items-center gap-1.5 text-xs text-ink-soft">
                   <input
                     type="checkbox"
-                    checked={filtrados.length > 0 && filtrados.every((cp) => seleccionDetalle.has(cp.id))}
+                    checked={visibles.length > 0 && visibles.every((cp) => seleccionDetalle.has(cp.id))}
                     onChange={(e) =>
-                      setSeleccionDetalle(e.target.checked ? new Set(filtrados.map((cp) => cp.id)) : new Set())
+                      setSeleccionDetalle(e.target.checked ? new Set(visibles.map((cp) => cp.id)) : new Set())
                     }
                   />
                   Seleccionar todos
                 </label>
+                </div>
                 <button
                   onClick={() =>
                     setDetalleCuenta({
@@ -436,8 +449,8 @@ export default function ClienteFicha({
                       clienteCuit: cliente.cuit,
                       comprobantes:
                         seleccionDetalle.size > 0
-                          ? filtrados.filter((cp) => seleccionDetalle.has(cp.id))
-                          : filtrados,
+                          ? visibles.filter((cp) => seleccionDetalle.has(cp.id))
+                          : visibles,
                       fecha: new Date().toLocaleDateString("es-AR"),
                     })
                   }
@@ -447,7 +460,7 @@ export default function ClienteFicha({
                 </button>
               </div>
               <div className="flex flex-col gap-1.5">
-                {filtrados.map((cp) => {
+                {visibles.map((cp) => {
                   const s = saldo(cp);
                   const pagado = estaPagado(cp);
                   const parcial = !pagado && cp.montoPagado > 0;
@@ -531,7 +544,7 @@ export default function ClienteFicha({
             </p>
           ) : (
             <div className="flex flex-col gap-1.5">
-              {pendientes.map((cp) => {
+              {pendientesOrdenados.map((cp) => {
                 const s = saldo(cp);
                 return (
                   <label
