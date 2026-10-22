@@ -8,7 +8,7 @@ import type { Articulo } from "@/lib/articulos/types";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
 import { clienteFromRow, type Cliente, type ClienteRow } from "@/lib/clientes/types";
-import { CONDICIONES_IVA, TIPOS_DOC, formatearCuit, type DatosManuales } from "@/lib/clientes/documento";
+import { CONDICIONES_IVA, TIPOS_DOC, formatearCuit, soloDigitos, type DatosManuales } from "@/lib/clientes/documento";
 import { DOC_LABELS, FORMAS_PAGO, type CartItem, type CondicionPago, type DocType } from "@/lib/ventas/types";
 import ComprobantePrint, { type ComprobanteDocData } from "@/lib/ventas/print";
 import ChequeModal, { type ChequeData } from "./ChequeModal";
@@ -266,6 +266,35 @@ export default function VentasView({
     finalizarVenta(null);
   }
 
+  function receptorParaArca() {
+    if (datosManuales) {
+      return { tipoDoc: datosManuales.tipoDoc, numero: datosManuales.numero, condicionIva: datosManuales.condicionIva };
+    }
+    if (selectedCliente && !selectedCliente.esConsumidorFinal) {
+      const d = soloDigitos(selectedCliente.cuit);
+      const tipoDoc = d.length === 11 ? "CUIT" : d.length >= 7 && d.length <= 8 ? "DNI" : "SIN";
+      return { tipoDoc, numero: d, condicionIva: selectedCliente.condicionIva ?? undefined };
+    }
+    const d = soloDigitos(dni);
+    return d
+      ? { tipoDoc: "DNI", numero: d, condicionIva: "consumidor_final" }
+      : { tipoDoc: "SIN", numero: "", condicionIva: "consumidor_final" };
+  }
+
+  // Los remitos no pasan por ARCA: siguen su propia numeración interna.
+  async function siguienteNumeroRemito(supabase: ReturnType<typeof createClient>, empresaPv: string) {
+    const prefijo = `${info.prefijo} ${empresaPv}-`;
+    const { data } = await supabase
+      .from("ventas")
+      .select("numero")
+      .like("numero", `${prefijo}%`)
+      .lt("numero", `${prefijo}01000000`)
+      .order("numero", { ascending: false })
+      .limit(1);
+    const ultimo = data?.[0]?.numero ? Number(String(data[0].numero).slice(prefijo.length)) : 0;
+    return `${prefijo}${String(ultimo + 1).padStart(8, "0")}`;
+  }
+
   async function finalizarVenta(chequeData: ChequeData | null) {
     setConfirming(true);
     setError("");
@@ -274,17 +303,42 @@ export default function VentasView({
     const clienteLabel = datosManuales?.razonSocial ?? selectedCliente?.razonSocial ?? "Consumidor Final";
 
     try {
-      const { data: n, error: seqErr } = await supabase.rpc("next_comprobante_numero");
-      if (seqErr) throw seqErr;
-      const numero = `${info.prefijo} ${empresa.puntoVenta}-${String(n).padStart(8, "0")}`;
-
+      let numero: string;
       let cae: string | undefined;
       let caeVencimiento: string | undefined;
+      let caeVencimientoIso: string | null = null;
+      let totalVenta = total;
+
       if (info.hasCae) {
-        cae = "7" + Math.floor(1000000000000 + Math.random() * 8999999999999).toString();
-        const vto = new Date();
-        vto.setDate(vto.getDate() + 10);
-        caeVencimiento = vto.toLocaleDateString("es-AR");
+        // Factura / NC: se autoriza en ARCA y se usa el número y el CAE reales.
+        const resp = await fetch("/api/arca/emitir", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            empresaCuit: empresa.cuit,
+            docType,
+            receptor: receptorParaArca(),
+            items: cart.map((c) => ({ cantidad: c.cantidad, precio: c.precio, iva: c.iva })),
+            descuento,
+            ncReferencia: isNC ? ncRef || undefined : undefined,
+          }),
+        });
+        const arca = await resp.json().catch(() => null);
+        if (!arca?.ok) {
+          setError(
+            [arca?.error ?? "No se pudo conectar con ARCA.", ...(arca?.detalles ?? [])].join(" — ") +
+              " (No se registró ninguna venta.)",
+          );
+          setConfirming(false);
+          return;
+        }
+        numero = arca.numero;
+        cae = arca.cae;
+        caeVencimientoIso = arca.caeVencimiento;
+        caeVencimiento = new Date(arca.caeVencimiento + "T12:00:00").toLocaleDateString("es-AR");
+        totalVenta = arca.total;
+      } else {
+        numero = await siguienteNumeroRemito(supabase, empresa.puntoVenta);
       }
 
       const { data: ventaRow, error: ventaErr } = await supabase
@@ -306,14 +360,12 @@ export default function VentasView({
               }
             : {}),
           condicion_pago: isNC ? "nc" : condicionPago,
-          subtotal,
+          subtotal: totalVenta + descuento,
           descuento,
-          total,
+          total: totalVenta,
           discrimina_iva: discIva,
           cae: cae ?? null,
-          cae_vencimiento: caeVencimiento
-            ? new Date(new Date().setDate(new Date().getDate() + 10)).toISOString().slice(0, 10)
-            : null,
+          cae_vencimiento: caeVencimientoIso,
           nc_referencia_numero: isNC ? ncRef || null : null,
         })
         .select("id")
@@ -349,7 +401,7 @@ export default function VentasView({
           empresa_cuit: empresa.cuit,
           tipo: info.nombre,
           numero,
-          total,
+          total: totalVenta,
         });
       }
 
@@ -357,7 +409,7 @@ export default function VentasView({
         await supabase.from("cheques").insert({
           tipo: condicionPago,
           titular: chequeData.titular,
-          importe: total,
+          importe: totalVenta,
           fecha_cobro: chequeData.fechaCobro,
           fecha_vencimiento: chequeData.fechaVencimiento,
           origen: "Venta",
@@ -372,7 +424,7 @@ export default function VentasView({
           docType,
           clienteNombre: clienteLabel,
           condicionPago,
-          total,
+          total: totalVenta,
           hora: new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
         },
         ...prev,
@@ -394,9 +446,9 @@ export default function VentasView({
           ? "Nota de crédito"
           : (FORMAS_PAGO.find((f) => f.id === condicionPago)?.label ?? condicionPago),
         items: cart,
-        subtotal,
+        subtotal: totalVenta + descuento,
         descuento,
-        total,
+        total: totalVenta,
         cae,
         caeVencimiento,
         fecha: new Date().toLocaleDateString("es-AR"),

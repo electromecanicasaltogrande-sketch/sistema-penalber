@@ -6,7 +6,7 @@ export async function traerClientes(supabase: SupabaseClient): Promise<Cliente[]
   const filas = await traerTodo<ClienteRow>((d, h) =>
     supabase
       .from("clientes")
-      .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default")
+      .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default, condicion_iva")
       .order("razon_social")
       .order("id")
       .range(d, h),

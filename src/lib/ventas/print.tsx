@@ -45,11 +45,15 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
         <div className="w-1/3">
           <p className="font-bold">{doc.empresa.razonSocial}</p>
           <p className="mt-1 leading-snug ink-70">
-            Tavella 1487, Concordia, Entre Ríos
+            {doc.empresa.domicilio}
             <br />
-            Tel.: (0345) 000-0000 · WhatsApp disponible
+            Tel.: {doc.empresa.telefono}
             <br />
-            Resp. Inscripto
+            {doc.empresa.condicionIva}
+            <br />
+            Ing. Brutos: {doc.empresa.ingresosBrutos}
+            <br />
+            Inicio de actividades: {doc.empresa.inicioActividades}
           </p>
         </div>
         <div className="flex w-16 flex-col items-center border line-50 py-1 text-center">

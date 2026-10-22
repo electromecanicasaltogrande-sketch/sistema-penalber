@@ -15,6 +15,7 @@ import {
 } from "@/lib/clientes/types";
 import { distribuirPago } from "@/lib/clientes/payment";
 import { DOC_LABELS } from "@/lib/ventas/types";
+import { CONDICIONES_IVA } from "@/lib/clientes/documento";
 import ReciboPago, { type ReciboData } from "./ReciboPago";
 import DetalleCuentaPrint, { type DetalleCuentaData } from "./DetalleCuentaPrint";
 
@@ -57,6 +58,7 @@ export default function ClienteFicha({
   const [direccion, setDireccion] = useState(cliente.direccion);
   const [localidad, setLocalidad] = useState(cliente.localidad);
   const [tipoComprobanteDefault, setTipoComprobanteDefault] = useState(cliente.tipoComprobanteDefault ?? "");
+  const [condicionIva, setCondicionIva] = useState(cliente.condicionIva ?? "");
   const [savingDatos, setSavingDatos] = useState(false);
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export default function ClienteFicha({
     setDireccion(cliente.direccion);
     setLocalidad(cliente.localidad);
     setTipoComprobanteDefault(cliente.tipoComprobanteDefault ?? "");
+    setCondicionIva(cliente.condicionIva ?? "");
     setSeleccionadas([]);
     setSeleccionDetalle(new Set());
     setTab("deuda");
@@ -297,6 +300,7 @@ export default function ClienteFicha({
         direccion: direccion.trim(),
         localidad: localidad.trim(),
         tipo_comprobante_default: tipoComprobanteDefault || null,
+        condicion_iva: condicionIva || null,
       })
       .eq("id", cliente.id);
     setSavingDatos(false);
@@ -309,6 +313,7 @@ export default function ClienteFicha({
       direccion,
       localidad,
       tipoComprobanteDefault: tipoComprobanteDefault || null,
+      condicionIva: condicionIva || null,
     });
   }
 
@@ -657,6 +662,24 @@ export default function ClienteFicha({
           <div className="flex flex-col gap-1">
             <label className={LABEL}>Localidad</label>
             <input className={FIELD} value={localidad} onChange={(e) => setLocalidad(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={LABEL}>Condición frente al IVA</label>
+            <div className="flex flex-wrap gap-1.5">
+              {[{ id: "", label: "Sin definir" }, ...CONDICIONES_IVA].map((c) => (
+                <button
+                  key={c.id || "sin"}
+                  type="button"
+                  onClick={() => setCondicionIva(c.id)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                    condicionIva === c.id ? "border-copper bg-copper text-white" : "border-border bg-bg text-ink-soft hover:bg-surface"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-0.5 text-[11px] text-ink-faint">Se envía a ARCA al facturar a este cliente.</p>
           </div>
           <div className="flex flex-col gap-1">
             <label className={LABEL}>Tipo de comprobante que se le hace habitualmente</label>
