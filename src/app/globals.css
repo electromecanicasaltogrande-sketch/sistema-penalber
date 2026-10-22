@@ -95,32 +95,14 @@ body {
   .print-only {
     display: block !important;
   }
-  /* Cada hoja de factura/NC ocupa una página completa. */
-  .print-page-full {
-    box-sizing: border-box;
-    width: 100%;
-    min-height: calc(100vh - 16mm);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+  /* Cada hoja del comprobante es exactamente la zona imprimible del A4 (210x297 menos 8mm de margen). */
+  .hoja {
     break-after: page;
     page-break-after: always;
   }
-  .print-page-full > * {
-    flex: 1;
-  }
-  .print-page-full:last-child {
+  .hoja:last-child {
     break-after: auto;
     page-break-after: auto;
-  }
-  /* El remito ocupa toda la hoja en una sola página, sin salto entre copias. */
-  .print-remito-page {
-    box-sizing: border-box;
-    width: 100%;
-    min-height: calc(100vh - 16mm);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
   }
 }
 
@@ -232,4 +214,12 @@ body {
   .dash-press:active {
     transform: none;
   }
+}
+
+/* Hoja A4 del comprobante: mismo tamaño en pantalla y en papel. */
+.hoja {
+  box-sizing: border-box;
+  width: 194mm;
+  height: 280mm;
+  overflow: hidden;
 }

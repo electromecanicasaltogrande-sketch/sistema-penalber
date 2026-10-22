@@ -122,11 +122,49 @@ function BarrasI25({ codigo }: { codigo: string }) {
 
 const COD_TIPO: Record<string, string> = { factura_a: "1", factura_b: "6", factura_c: "11", nc_a: "3", nc_b: "8", remito_r: "91" };
 
-function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string }) {
+// Cuántas líneas de texto entran en una hoja A4 (una línea = una fila de una sola línea de descripción).
+const LINEAS_FACTURA = 18;
+const LINEAS_REMITO_HOJA = 24;
+const LINEAS_REMITO_MITAD = 5;
+
+function lineasDe(it: CartItem): number {
+  const texto = it.descripcion + (it.marca ? ` — ${it.marca}` : "");
+  return Math.max(1, Math.ceil(texto.length / 52));
+}
+
+function partirItems(items: CartItem[], presupuesto: number): CartItem[][] {
+  const hojas: CartItem[][] = [];
+  let actual: CartItem[] = [];
+  let usado = 0;
+  for (const it of items) {
+    const l = lineasDe(it);
+    if (actual.length > 0 && usado + l > presupuesto) {
+      hojas.push(actual);
+      actual = [];
+      usado = 0;
+    }
+    actual.push(it);
+    usado += l;
+  }
+  hojas.push(actual);
+  return hojas;
+}
+
+interface CopiaProps {
+  doc: ComprobanteDocData;
+  etiqueta: string;
+  items: CartItem[];
+  pagina: number;
+  paginas: number;
+  compacto?: boolean;
+}
+
+function Copia({ doc, etiqueta, items, pagina, paginas, compacto }: CopiaProps) {
   const info = DOC_LABELS[doc.docType];
   const isRemito = !info.hasCae;
   const esA = doc.docType === "factura_a" || doc.docType === "nc_a";
   const codTipo = COD_TIPO[doc.docType] ?? "6";
+  const ultima = pagina === paginas;
 
   const ratio = doc.subtotal > 0 ? doc.total / doc.subtotal : 1;
   const porAlicuota = new Map<number, number>();
@@ -142,12 +180,21 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
   const barras = isRemito ? null : codigoBarrasAfip(doc, codTipo);
   const numero = doc.numero.replace(/^[A-Z ]+/, "");
   const tipoDoc = doc.clienteTipoDoc && doc.clienteTipoDoc !== "SIN" ? doc.clienteTipoDoc : "DNI";
+  const mostrarNeto = esA || isRemito;
+  const num = "whitespace-nowrap pl-2 text-right tabular-nums";
 
   return (
-    <div className="h-full border line-70 p-5 text-[11px] text-black print:p-6 print:text-[13px]">
-      <div className="mb-2 text-center text-[10px] font-bold tracking-widest ink-60">{etiqueta}</div>
+    <div
+      className={`flex h-full min-h-0 flex-col border line-70 text-black ${
+        compacto ? "p-3 text-[10px] leading-tight" : "p-5 text-[11px]"
+      }`}
+    >
+      <div className="mb-1.5 text-center text-[10px] font-bold tracking-widest ink-60">
+        {etiqueta}
+        {paginas > 1 ? ` — Hoja ${pagina} de ${paginas}` : ""}
+      </div>
       <div className="flex items-start justify-between border-b line-40 pb-2">
-        <div className="w-1/3">
+        <div className="w-[36%]">
           <p className="font-bold">{emp.razonSocial}</p>
           <p className="mt-1 leading-snug ink-70">
             {emp.titular.toUpperCase()}
@@ -171,14 +218,14 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
             {emp.condicionIva}
           </p>
         </div>
-        <div className="flex w-16 flex-col items-center border line-50 py-1 text-center">
+        <div className="flex w-14 flex-col items-center border line-50 py-1 text-center">
           <span className="text-2xl font-bold">{info.letra}</span>
           <span className="text-[8px]">COD.{codTipo.padStart(2, "0")}</span>
         </div>
-        <div className="w-1/3 text-right">
+        <div className="w-[36%] text-right">
           <p className="font-bold uppercase">{info.nombre.replace(/^Nota de Crédito.*/, "Nota de Crédito")}</p>
           <p>N° {numero}</p>
-          <p className="mt-1.5">CUIT: {emp.cuit}</p>
+          <p className="mt-1">CUIT: {emp.cuit}</p>
           <p>Inicio Act.: {emp.inicioActividades}</p>
           <p>Ing. Brutos: {emp.ingresosBrutos}</p>
           <p>
@@ -188,7 +235,7 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
         </div>
       </div>
 
-      <div className="border-b line-40 py-2">
+      <div className="border-b line-40 py-1.5">
         <p>
           <b>CLIENTE:</b> {doc.clienteCodigo ? `<<${doc.clienteCodigo}>> ` : ""}
           {doc.clienteNombre}
@@ -206,95 +253,121 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
         </p>
       </div>
 
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b line-40 text-left">
-            <th className="py-1">CANT.</th>
-            <th className="py-1">CÓDIGO</th>
-            <th className="py-1">DESCRIPCIÓN</th>
-            {!isRemito && <th className="py-1 text-center">IVA</th>}
-            <th className="py-1 text-right">P. UNIT.</th>
-            <th className="py-1 text-right">%Bon.</th>
-            <th className="py-1 text-right">Bon.</th>
-            <th className="py-1 text-right">TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {doc.items.map((it, i) => {
-            const unit = esA ? it.precio / (1 + it.iva / 100) : it.precio;
-            return (
-              <tr key={i} className="border-b line-10">
-                <td className="py-1">{money2(it.cantidad)}</td>
-                <td className="py-1">{it.codigo || "S/C"}</td>
-                <td className="py-1">
-                  {it.descripcion}
-                  {it.marca ? ` — ${it.marca}` : ""}
-                </td>
-                {!isRemito && <td className="py-1 text-center">{money2(it.iva)}</td>}
-                <td className="py-1 text-right">{money2(unit)}</td>
-                <td className="py-1 text-right">0,00</td>
-                <td className="py-1 text-right">0,00</td>
-                <td className="py-1 text-right">{money2(unit * it.cantidad)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <div className="mt-3 flex items-start justify-between">
-        <div className="w-1/2">
-          <p>SON PESOS: {amountToWords(doc.total)}</p>
-          {!isRemito &&
-            [...porAlicuota.entries()].map(([a, v]) => (
-              <p key={a} className="mt-1">
-                IVA {a.toFixed(2)} {v.toFixed(2)}
-              </p>
-            ))}
-        </div>
-        <div className="w-52">
-          <div className="flex justify-between border-b line-10 py-0.5">
-            <span>NETO $:</span>
-            <span>{money2(esA || isRemito ? neto : doc.total)}</span>
-          </div>
-          <div className="flex justify-between border-b line-10 py-0.5">
-            <span>BONIF $:</span>
-            <span>{money2(doc.descuento)}</span>
-          </div>
-          <div className="flex justify-between border-b line-10 py-0.5">
-            <span>SUBTOT $:</span>
-            <span>{money2(esA || isRemito ? neto : doc.total)}</span>
-          </div>
-          {esA && (
-            <div className="flex justify-between border-b line-10 py-0.5">
-              <span>IVA $:</span>
-              <span>{money2(iva)}</span>
-            </div>
-          )}
-          <div className="flex justify-between py-0.5 font-bold">
-            <span>TOTAL $:</span>
-            <span>{money2(doc.total)}</span>
-          </div>
-        </div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <table className="w-full table-fixed border-collapse">
+          <colgroup>
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "11%" }} />
+            <col />
+            {!isRemito && <col style={{ width: "7%" }} />}
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "13%" }} />
+          </colgroup>
+          <thead>
+            <tr className="border-b line-40 text-left">
+              <th className="py-1">CANT.</th>
+              <th className="py-1">CÓDIGO</th>
+              <th className="py-1">DESCRIPCIÓN</th>
+              {!isRemito && <th className="py-1 text-center">IVA</th>}
+              <th className={`py-1 ${num}`}>P. UNIT.</th>
+              <th className={`py-1 ${num}`}>%Bon.</th>
+              <th className={`py-1 ${num}`}>Bon.</th>
+              <th className={`py-1 ${num}`}>TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => {
+              const unit = esA ? it.precio / (1 + it.iva / 100) : it.precio;
+              return (
+                <tr key={i} className="border-b line-10 align-top">
+                  <td className="py-0.5">{money2(it.cantidad)}</td>
+                  <td className="truncate py-0.5">{it.codigo || "S/C"}</td>
+                  <td className="py-0.5 pr-1">
+                    {it.descripcion}
+                    {it.marca ? ` — ${it.marca}` : ""}
+                  </td>
+                  {!isRemito && <td className="py-0.5 text-center">{money2(it.iva)}</td>}
+                  <td className={`py-0.5 ${num}`}>{money2(unit)}</td>
+                  <td className={`py-0.5 ${num}`}>0,00</td>
+                  <td className={`py-0.5 ${num}`}>0,00</td>
+                  <td className={`py-0.5 ${num}`}>{money2(unit * it.cantidad)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {!isRemito ? (
-        <div className="mt-3 border-t line-40 pt-2">
-          <p>
-            CAE N°: {doc.cae} &nbsp;&nbsp; Vto. CAE: {doc.caeVencimiento}
-          </p>
-          {barras && (
-            <div className="mt-2">
-              <BarrasI25 codigo={barras} />
+      {!ultima ? (
+        <div className="border-t line-40 pt-2 text-center font-bold">Continúa en la hoja siguiente…</div>
+      ) : (
+        <div className="border-t line-40 pt-2">
+          <div className="flex items-start justify-between gap-4">
+            <div className="w-1/2">
+              <p>SON PESOS: {amountToWords(doc.total)}</p>
+              {!isRemito &&
+                [...porAlicuota.entries()].map(([a, v]) => (
+                  <p key={a} className="mt-1">
+                    IVA {a.toFixed(2)} {v.toFixed(2)}
+                  </p>
+                ))}
+            </div>
+            <div className="w-52 shrink-0">
+              <div className="flex justify-between border-b line-10 py-0.5">
+                <span>NETO $:</span>
+                <span>{money2(mostrarNeto ? neto : doc.total)}</span>
+              </div>
+              <div className="flex justify-between border-b line-10 py-0.5">
+                <span>BONIF $:</span>
+                <span>{money2(doc.descuento)}</span>
+              </div>
+              <div className="flex justify-between border-b line-10 py-0.5">
+                <span>SUBTOT $:</span>
+                <span>{money2(mostrarNeto ? neto : doc.total)}</span>
+              </div>
+              {esA && (
+                <div className="flex justify-between border-b line-10 py-0.5">
+                  <span>IVA $:</span>
+                  <span>{money2(iva)}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-0.5 text-[1.1em] font-bold">
+                <span>TOTAL $:</span>
+                <span>{money2(doc.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {!isRemito ? (
+            <div className="mt-3 border-t line-40 pt-2">
+              <p>
+                CAE N°: {doc.cae} &nbsp;&nbsp; Vto. CAE: {doc.caeVencimiento}
+              </p>
+              {barras && (
+                <div className="mt-2">
+                  <BarrasI25 codigo={barras} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={`flex justify-end gap-8 text-center text-[10px] ${compacto ? "mt-4" : "mt-8"}`}>
+              <div className="w-32 border-t line-50 pt-1">Firma del cliente</div>
+              <div className="w-32 border-t line-50 pt-1">Aclaración</div>
+              <div className="w-24 border-t line-50 pt-1">DNI</div>
             </div>
           )}
         </div>
-      ) : (
-        <div className="mt-6 flex justify-end gap-10 text-center text-[10px]">
-          <div className="w-32 border-t line-50 pt-1">Firma del cliente</div>
-          <div className="w-32 border-t line-50 pt-1">Aclaración</div>
-          <div className="w-24 border-t line-50 pt-1">DNI</div>
-        </div>
       )}
+    </div>
+  );
+}
+
+function Hoja({ children }: { children: React.ReactNode }) {
+  return (
+    <div data-pdf-page className="hoja bg-white">
+      {children}
     </div>
   );
 }
@@ -304,26 +377,47 @@ function Copias({ doc }: { doc: ComprobanteDocData }) {
   const isRemito = !info.hasCae;
 
   if (isRemito) {
+    const lineas = doc.items.reduce((s, it) => s + lineasDe(it), 0);
+    if (lineas <= LINEAS_REMITO_MITAD) {
+      return (
+        <Hoja>
+          <div className="flex h-full flex-col">
+            <div className="min-h-0 flex-1">
+              <Copia doc={doc} etiqueta="COPIA CLIENTE" items={doc.items} pagina={1} paginas={1} compacto />
+            </div>
+            <div className="my-1 border-t border-dashed line-40" />
+            <div className="min-h-0 flex-1">
+              <Copia doc={doc} etiqueta="COPIA NEGOCIO — FIRMA DEL CLIENTE" items={doc.items} pagina={1} paginas={1} compacto />
+            </div>
+          </div>
+        </Hoja>
+      );
+    }
+    // Muchos renglones: cada copia ocupa hojas completas.
+    const hojas = partirItems(doc.items, LINEAS_REMITO_HOJA);
     return (
-      <div data-pdf-page className="print-remito-page bg-white p-4">
-        <Copia doc={doc} etiqueta="COPIA CLIENTE" />
-        <div className="my-2 border-t border-dashed line-40" />
-        <Copia doc={doc} etiqueta="COPIA NEGOCIO — FIRMA DEL CLIENTE" />
-      </div>
+      <>
+        {["COPIA CLIENTE", "COPIA NEGOCIO — FIRMA DEL CLIENTE"].flatMap((et) =>
+          hojas.map((items, i) => (
+            <Hoja key={`${et}-${i}`}>
+              <Copia doc={doc} etiqueta={et} items={items} pagina={i + 1} paginas={hojas.length} />
+            </Hoja>
+          )),
+        )}
+      </>
     );
   }
 
+  const hojas = partirItems(doc.items, LINEAS_FACTURA);
   return (
     <>
-      <div data-pdf-page className="print-page-full bg-white p-6">
-        <Copia doc={doc} etiqueta="ORIGINAL" />
-      </div>
-      <div data-pdf-page className="print-page-full bg-white p-6">
-        <Copia doc={doc} etiqueta="DUPLICADO" />
-      </div>
-      <div data-pdf-page className="print-page-full bg-white p-6">
-        <Copia doc={doc} etiqueta="TRIPLICADO" />
-      </div>
+      {["ORIGINAL", "DUPLICADO", "TRIPLICADO"].flatMap((et) =>
+        hojas.map((items, i) => (
+          <Hoja key={`${et}-${i}`}>
+            <Copia doc={doc} etiqueta={et} items={items} pagina={i + 1} paginas={hojas.length} />
+          </Hoja>
+        )),
+      )}
     </>
   );
 }
@@ -352,7 +446,7 @@ export default function ComprobantePrint({
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8 print:hidden">
-        <div className="relative flex max-h-full w-full max-w-xl flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
+        <div className="relative flex max-h-full w-full max-w-[860px] flex-col rounded-[var(--radius-app)] border border-border bg-surface shadow-lg">
           <button
             onClick={onClose}
             aria-label="Cerrar"
@@ -368,7 +462,7 @@ export default function ComprobantePrint({
           </div>
 
           <div className="overflow-y-auto bg-bg p-4">
-            <div ref={previewRef} className="flex flex-col gap-3 shadow-sm">
+            <div ref={previewRef} className="mx-auto flex w-fit flex-col gap-3 shadow-sm">
               <Copias doc={doc} />
             </div>
           </div>

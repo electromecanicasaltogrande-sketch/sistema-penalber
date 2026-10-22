@@ -16,9 +16,15 @@ export async function descargarComoPDF(elemento: HTMLElement, nombreArchivo: str
   for (let i = 0; i < objetivos.length; i++) {
     const canvas = await html2canvas(objetivos[i], { scale: 2, backgroundColor: "#ffffff" });
     const imgData = canvas.toDataURL("image/png");
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
+    const margen = 8;
+    let w = pageWidth - margen * 2;
+    let h = (canvas.height * w) / canvas.width;
+    if (h > pageHeight - margen * 2) {
+      h = pageHeight - margen * 2;
+      w = (canvas.width * h) / canvas.height;
+    }
     if (i > 0) pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, 0, pageWidth, Math.min(imgHeight, pageHeight));
+    pdf.addImage(imgData, "PNG", margen, margen, w, h);
   }
 
   pdf.save(nombreArchivo);
