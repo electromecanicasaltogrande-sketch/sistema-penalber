@@ -1,5 +1,6 @@
 "use client";
 
+import FechaInput from "@/components/ui/FechaInput";
 import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import type { VentaRow } from "@/lib/ventas/historial";
@@ -98,9 +99,9 @@ export default function ReportesView({
     <div>
       <div className="mb-5 flex items-center gap-2.5">
         <label className="text-xs font-semibold text-ink-soft">Período</label>
-        <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={FIELD} />
+        <FechaInput value={desde} onChange={setDesde} className={FIELD} />
         <span className="text-xs text-ink-faint">a</span>
-        <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className={FIELD} />
+        <FechaInput value={hasta} onChange={setHasta} className={FIELD} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

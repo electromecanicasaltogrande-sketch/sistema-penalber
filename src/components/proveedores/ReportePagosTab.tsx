@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import FechaInput from "@/components/ui/FechaInput";
 import { money } from "@/lib/format";
 import { totalFactura, type FacturaCompra, type Proveedor } from "@/lib/proveedores/types";
 
@@ -64,9 +65,9 @@ export default function ReportePagosTab({
             </option>
           ))}
         </select>
-        <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={FIELD} />
+        <FechaInput value={desde} onChange={setDesde} className={FIELD} />
         <span className="text-xs text-ink-faint">a</span>
-        <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className={FIELD} />
+        <FechaInput value={hasta} onChange={setHasta} className={FIELD} />
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-app)] border border-border bg-surface">

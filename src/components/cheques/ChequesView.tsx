@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import FechaInput from "@/components/ui/FechaInput";
 import { money } from "@/lib/format";
 import { chequeFromRow, diasHasta, estadoCheque, type Cheque, type ChequeRow } from "@/lib/cheques/types";
 
@@ -24,6 +25,8 @@ const ESTADO_LABEL: Record<string, string> = {
 export default function ChequesView({ initialCheques }: { initialCheques: Cheque[] }) {
   const [cheques, setCheques] = useState(initialCheques);
   const [search, setSearch] = useState("");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -51,8 +54,9 @@ export default function ChequesView({ initialCheques }: { initialCheques: Cheque
     const q = search.toLowerCase();
     return cheques
       .filter((c) => !q || c.titular.toLowerCase().includes(q))
+      .filter((c) => (!desde || c.fechaVencimiento >= desde) && (!hasta || c.fechaVencimiento <= hasta))
       .sort((a, b) => a.fechaVencimiento.localeCompare(b.fechaVencimiento));
-  }, [cheques, search]);
+  }, [cheques, search, desde, hasta]);
 
   async function toggleCobrado(c: Cheque) {
     const supabase = createClient();
@@ -62,12 +66,18 @@ export default function ChequesView({ initialCheques }: { initialCheques: Cheque
 
   return (
     <div>
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar por titular…"
-        className="mb-4 w-full max-w-sm rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-copper focus:ring-1 focus:ring-copper"
-      />
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por titular…"
+          className="w-full max-w-sm rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-copper focus:ring-1 focus:ring-copper"
+        />
+        <span className="text-xs text-ink-faint">Vencimiento</span>
+        <FechaInput value={desde} onChange={setDesde} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-copper focus:ring-1 focus:ring-copper" />
+        <span className="text-xs text-ink-faint">a</span>
+        <FechaInput value={hasta} onChange={setHasta} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-copper focus:ring-1 focus:ring-copper" />
+      </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-app)] border border-border bg-surface">
         <table className="w-full text-sm">

@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import FechaInput from "@/components/ui/FechaInput";
 import { money } from "@/lib/format";
 import { EMPRESAS } from "@/lib/empresas";
 import {
@@ -29,6 +30,9 @@ export default function FacturasCompraTab({
   onFacturaCreada: (f: FacturaCompra) => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
+  const [estado, setEstado] = useState<"pendientes" | "pagadas" | "todas">("pendientes");
+  const [filtroDesde, setFiltroDesde] = useState("");
+  const [filtroHasta, setFiltroHasta] = useState("");
   const [proveedorId, setProveedorId] = useState("");
   const [proveedorSearch, setProveedorSearch] = useState("");
   const [showNuevoProveedor, setShowNuevoProveedor] = useState(false);
@@ -67,12 +71,18 @@ export default function FacturasCompraTab({
 
   const facturasFiltradas = useMemo(() => {
     const q = busqueda.toLowerCase();
-    if (!q) return facturas;
-    return facturas.filter((f) => {
-      const p = proveedores.find((pr) => pr.id === f.proveedorId);
-      return p?.razonSocial.toLowerCase().includes(q);
-    });
-  }, [facturas, proveedores, busqueda]);
+    return facturas
+      .filter((f) => {
+        if (estado === "pendientes" && f.pagada) return false;
+        if (estado === "pagadas" && !f.pagada) return false;
+        if (filtroDesde && f.fechaFactura < filtroDesde) return false;
+        if (filtroHasta && f.fechaFactura > filtroHasta) return false;
+        if (!q) return true;
+        const p = proveedores.find((pr) => pr.id === f.proveedorId);
+        return p?.razonSocial.toLowerCase().includes(q);
+      })
+      .sort((x, y) => y.fechaFactura.localeCompare(x.fechaFactura));
+  }, [facturas, proveedores, busqueda, estado, filtroDesde, filtroHasta]);
 
   async function guardarFactura() {
     setError("");
@@ -121,12 +131,31 @@ export default function FacturasCompraTab({
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_380px]">
       <div>
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por proveedor…"
-          className={`${FIELD} mb-3 max-w-sm`}
-        />
+        <div className="mb-3 flex flex-wrap items-center gap-2.5">
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por proveedor…"
+            className={`${FIELD} max-w-xs`}
+          />
+          <FechaInput value={filtroDesde} onChange={setFiltroDesde} className={FIELD} />
+          <span className="text-xs text-ink-faint">a</span>
+          <FechaInput value={filtroHasta} onChange={setFiltroHasta} className={FIELD} />
+          <div className="flex gap-1">
+            {([["pendientes","Pendientes"],["pagadas","Pagadas"],["todas","Todas"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setEstado(id)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  estado === id ? "border-copper bg-copper text-white" : "border-border text-ink-soft hover:bg-bg"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="overflow-x-auto rounded-[var(--radius-app)] border border-border bg-surface">
           <table className="w-full text-sm">
             <thead>

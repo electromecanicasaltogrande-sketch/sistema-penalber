@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import FechaInput from "@/components/ui/FechaInput";
 import { money } from "@/lib/format";
 import { totalFactura, type FacturaCompra, type Proveedor } from "@/lib/proveedores/types";
 import RecepcionModal from "./RecepcionModal";
@@ -28,6 +29,9 @@ export default function ProveedorFicha({
   const [email, setEmail] = useState(proveedor.email);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [estado, setEstado] = useState<"pendientes" | "pagadas" | "todas">("pendientes");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
   const [recepcion, setRecepcion] = useState<{ facturaId: string } | null>(null);
 
   useEffect(() => {
@@ -42,6 +46,13 @@ export default function ProveedorFicha({
   const facturasProveedor = facturas
     .filter((f) => f.proveedorId === proveedor.id)
     .sort((a, b) => b.fechaFactura.localeCompare(a.fechaFactura));
+  const visibles = facturasProveedor.filter((f) => {
+    if (estado === "pendientes" && f.pagada) return false;
+    if (estado === "pagadas" && !f.pagada) return false;
+    if (desde && f.fechaFactura < desde) return false;
+    if (hasta && f.fechaFactura > hasta) return false;
+    return true;
+  });
   const pendientes = facturasProveedor.filter((f) => !f.pagada);
   const totalPendiente = pendientes.reduce((s, f) => s + totalFactura(f), 0);
   const totalGeneral = facturasProveedor.reduce((s, f) => s + totalFactura(f), 0);
@@ -137,11 +148,30 @@ export default function ProveedorFicha({
 
       <div className="mt-6">
         <p className={LABEL}>Facturas de este proveedor</p>
-        {facturasProveedor.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink-faint">Sin facturas cargadas.</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2.5">
+          <FechaInput value={desde} onChange={setDesde} className={FIELD} />
+          <span className="text-xs text-ink-faint">a</span>
+          <FechaInput value={hasta} onChange={setHasta} className={FIELD} />
+          <div className="flex gap-1">
+            {([["pendientes","Pendientes"],["pagadas","Pagadas"],["todas","Todas"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setEstado(id)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  estado === id ? "border-copper bg-copper text-white" : "border-border text-ink-soft hover:bg-bg"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {visibles.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink-faint">Sin facturas para este filtro.</p>
         ) : (
           <div className="mt-2 flex flex-col gap-1.5">
-            {facturasProveedor.map((f) => (
+            {visibles.map((f) => (
               <div
                 key={f.id}
                 className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"

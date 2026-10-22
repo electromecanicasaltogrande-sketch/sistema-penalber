@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FechaInput from "@/components/ui/FechaInput";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
 import { empresaCorta } from "@/lib/empresas";
@@ -114,9 +115,9 @@ export default function HistorialView({
           placeholder="Buscar por cliente…"
           className={`${FIELD} min-w-[220px] flex-1`}
         />
-        <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={FIELD} />
+        <FechaInput value={desde} onChange={setDesde} className={FIELD} />
         <span className="text-xs text-ink-faint">a</span>
-        <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className={FIELD} />
+        <FechaInput value={hasta} onChange={setHasta} className={FIELD} />
         <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoFiltro)} className={FIELD}>
           <option value="">Todos los tipos</option>
           <option value="factura">Facturas</option>

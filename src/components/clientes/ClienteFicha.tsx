@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import FechaInput from "@/components/ui/FechaInput";
 import { money } from "@/lib/format";
 import { EMPRESAS, empresaCorta } from "@/lib/empresas";
 import {
@@ -48,7 +49,7 @@ export default function ClienteFicha({
   const [seleccionDetalle, setSeleccionDetalle] = useState<Set<string>>(new Set());
   const [detalleCuenta, setDetalleCuenta] = useState<DetalleCuentaData | null>(null);
   const [error, setError] = useState("");
-  const [mostrarPagados, setMostrarPagados] = useState(false);
+  const [vista, setVista] = useState<"pendientes" | "pagados" | "todos">("pendientes");
   const [pagosHist, setPagosHist] = useState<{ id: string; monto: number; forma_pago: string; fecha: string }[]>([]);
 
   // Datos tab
@@ -159,7 +160,7 @@ export default function ClienteFicha({
   const pagados = filtrados.filter((cp) => estaPagado(cp));
   const masRecientesPrimero = (a: CtaCteComprobante, b: CtaCteComprobante) =>
     b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero);
-  const visibles = [...(mostrarPagados ? filtrados : pendientes)].sort(masRecientesPrimero);
+  const visibles = [...(vista === "pendientes" ? pendientes : vista === "pagados" ? pagados : filtrados)].sort(masRecientesPrimero);
   const pendientesOrdenados = [...pendientes].sort(masRecientesPrimero);
   const saldoPendiente = pendientes.reduce((s, cp) => s + saldo(cp), 0);
   const saldoPagado = pagados.reduce((s, cp) => s + cp.total, 0);
@@ -394,17 +395,15 @@ export default function ClienteFicha({
 
       {(tab === "deuda" || tab === "pago") && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <input
-            type="date"
+          <FechaInput
             value={desde}
-            onChange={(e) => setDesde(e.target.value)}
+            onChange={setDesde}
             className="rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs text-ink-soft"
           />
           <span className="text-xs text-ink-faint">a</span>
-          <input
-            type="date"
+          <FechaInput
             value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
+            onChange={setHasta}
             className="rounded-lg border border-border bg-bg px-2.5 py-1.5 text-xs text-ink-soft"
           />
         </div>
@@ -422,20 +421,36 @@ export default function ClienteFicha({
               <p className="mt-1 font-mono text-lg font-bold text-success">{money(saldoPagado)}</p>
             </div>
           </div>
+          <div className="mb-3">
+            <div className="flex gap-1">
+              {([
+                ["pendientes", `Pendientes (${pendientes.length})`],
+                ["pagados", `Pagados (${pagados.length})`],
+                ["todos", "Todos"],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setVista(id)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                    vista === id ? "border-copper bg-copper text-white" : "border-border text-ink-soft hover:bg-bg"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           {loading ? (
             <p className="text-sm text-ink-faint">Cargando…</p>
           ) : visibles.length === 0 ? (
             <p className="py-6 text-center text-sm text-ink-faint">
-              {mostrarPagados ? "Sin comprobantes para este filtro." : "No tiene comprobantes pendientes en este filtro."}
+              {vista === "pendientes" ? "No tiene comprobantes pendientes en este filtro." : "Sin comprobantes para este filtro."}
             </p>
           ) : (
             <>
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-1.5 text-xs text-ink-soft">
-                  <input type="checkbox" checked={mostrarPagados} onChange={(e) => setMostrarPagados(e.target.checked)} />
-                  Mostrar también los ya pagados
-                </label>
                 <label className="flex items-center gap-1.5 text-xs text-ink-soft">
                   <input
                     type="checkbox"

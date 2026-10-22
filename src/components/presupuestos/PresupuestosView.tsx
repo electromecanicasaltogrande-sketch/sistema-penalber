@@ -1,5 +1,6 @@
 "use client";
 
+import FechaInput from "@/components/ui/FechaInput";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -420,9 +421,9 @@ export default function PresupuestosView({
           <div className="mb-4 flex flex-wrap items-center gap-2.5">
             <input value={histCliente} onChange={(e) => setHistCliente(e.target.value)} placeholder="Cliente…" className={`${FIELD} max-w-[200px]`} />
             <input value={histNumero} onChange={(e) => setHistNumero(e.target.value)} placeholder="N° presupuesto…" className={`${FIELD} max-w-[160px]`} />
-            <input type="date" value={histDesde} onChange={(e) => setHistDesde(e.target.value)} className={FIELD} />
+            <FechaInput value={histDesde} onChange={setHistDesde} className={FIELD} />
             <span className="text-xs text-ink-faint">a</span>
-            <input type="date" value={histHasta} onChange={(e) => setHistHasta(e.target.value)} className={FIELD} />
+            <FechaInput value={histHasta} onChange={setHistHasta} className={FIELD} />
           </div>
 
           <div className="overflow-x-auto rounded-[var(--radius-app)] border border-border bg-surface">
