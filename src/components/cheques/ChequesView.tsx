@@ -27,6 +27,7 @@ export default function ChequesView({ initialCheques }: { initialCheques: Cheque
   const [search, setSearch] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+  const [vista, setVista] = useState<"pendientes" | "cobrados" | "todos">("pendientes");
 
   useEffect(() => {
     const supabase = createClient();
@@ -50,13 +51,23 @@ export default function ChequesView({ initialCheques }: { initialCheques: Cheque
     };
   }, []);
 
-  const filtrados = useMemo(() => {
+  const base = useMemo(() => {
     const q = search.toLowerCase();
     return cheques
       .filter((c) => !q || c.titular.toLowerCase().includes(q))
-      .filter((c) => (!desde || c.fechaVencimiento >= desde) && (!hasta || c.fechaVencimiento <= hasta))
-      .sort((a, b) => a.fechaVencimiento.localeCompare(b.fechaVencimiento));
+      .filter((c) => (!desde || c.fechaVencimiento >= desde) && (!hasta || c.fechaVencimiento <= hasta));
   }, [cheques, search, desde, hasta]);
+
+  // Pendientes: los que antes se cobran o vencen primero. Cobrados: los más recientes primero.
+  const pendientes = useMemo(
+    () => base.filter((c) => !c.cobrado).sort((x, y) => x.fechaVencimiento.localeCompare(y.fechaVencimiento) || x.fechaCobro.localeCompare(y.fechaCobro)),
+    [base],
+  );
+  const cobrados = useMemo(
+    () => base.filter((c) => c.cobrado).sort((x, y) => y.fechaVencimiento.localeCompare(x.fechaVencimiento)),
+    [base],
+  );
+  const filtrados = vista === "pendientes" ? pendientes : vista === "cobrados" ? cobrados : [...pendientes, ...cobrados];
 
   async function toggleCobrado(c: Cheque) {
     const supabase = createClient();
@@ -77,6 +88,27 @@ export default function ChequesView({ initialCheques }: { initialCheques: Cheque
         <FechaInput value={desde} onChange={setDesde} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-copper focus:ring-1 focus:ring-copper" />
         <span className="text-xs text-ink-faint">a</span>
         <FechaInput value={hasta} onChange={setHasta} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-copper focus:ring-1 focus:ring-copper" />
+      </div>
+
+      <div className="mb-3 flex gap-1">
+        {(
+          [
+            ["pendientes", `Pendientes (${pendientes.length})`],
+            ["cobrados", `Cobrados (${cobrados.length})`],
+            ["todos", "Todos"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setVista(id)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+              vista === id ? "border-copper bg-copper text-white" : "border-border text-ink-soft hover:bg-bg"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-app)] border border-border bg-surface">
