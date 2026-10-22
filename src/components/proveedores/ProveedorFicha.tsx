@@ -49,8 +49,8 @@ export default function ProveedorFicha({
   const visibles = facturasProveedor.filter((f) => {
     if (estado === "pendientes" && f.pagada) return false;
     if (estado === "pagadas" && !f.pagada) return false;
-    if (desde && f.fechaFactura < desde) return false;
-    if (hasta && f.fechaFactura > hasta) return false;
+    if ((desde || hasta) && f.fechaFactura < (desde || hasta)) return false;
+    if ((hasta || desde) && f.fechaFactura > (hasta || desde)) return false;
     return true;
   });
   const pendientes = facturasProveedor.filter((f) => !f.pagada);

@@ -55,7 +55,7 @@ export default function ChequesView({ initialCheques }: { initialCheques: Cheque
     const q = search.toLowerCase();
     return cheques
       .filter((c) => !q || c.titular.toLowerCase().includes(q))
-      .filter((c) => (!desde || c.fechaVencimiento >= desde) && (!hasta || c.fechaVencimiento <= hasta));
+      .filter((c) => (!(desde || hasta) || c.fechaVencimiento >= (desde || hasta)) && (!(hasta || desde) || c.fechaVencimiento <= (hasta || desde)));
   }, [cheques, search, desde, hasta]);
 
   // Pendientes: los que antes se cobran o vencen primero. Cobrados: los más recientes primero.

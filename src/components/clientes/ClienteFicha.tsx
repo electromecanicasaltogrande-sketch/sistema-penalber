@@ -150,8 +150,8 @@ export default function ClienteFicha({
   const filtrados = useMemo(() => {
     return comps.filter((cp) => {
       if (empresaFiltro && cp.empresaCuit !== empresaFiltro) return false;
-      if (desde && cp.fecha < desde) return false;
-      if (hasta && cp.fecha > hasta) return false;
+      if ((desde || hasta) && cp.fecha < (desde || hasta)) return false;
+      if ((hasta || desde) && cp.fecha > (hasta || desde)) return false;
       return true;
     });
   }, [comps, empresaFiltro, desde, hasta]);

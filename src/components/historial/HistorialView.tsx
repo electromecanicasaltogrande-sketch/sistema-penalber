@@ -46,8 +46,10 @@ export default function HistorialView({
       .order("creado_en", { ascending: false })
       .range(desdeFila, desdeFila + PAGINA - 1);
     if (cliente.trim()) q = q.ilike("cliente_nombre", `%${cliente.trim().replace(/[%_]/g, (m) => "\\" + m)}%`);
-    if (desde) q = q.gte("creado_en", desde + "T00:00:00-03:00");
-    if (hasta) q = q.lte("creado_en", hasta + "T23:59:59-03:00");
+    const dd = desde || hasta;
+    const hh = hasta || desde;
+    if (dd) q = q.gte("creado_en", dd + "T00:00:00-03:00");
+    if (hh) q = q.lte("creado_en", hh + "T23:59:59-03:00");
     if (tipo === "factura") q = q.in("doc_type", ["factura_a", "factura_b", "factura_c"]);
     if (tipo === "remito") q = q.eq("doc_type", "remito_r");
     if (tipo === "nc") q = q.in("doc_type", ["nc_a", "nc_b"]);

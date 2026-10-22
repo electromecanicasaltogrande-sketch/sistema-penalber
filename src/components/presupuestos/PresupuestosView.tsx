@@ -193,8 +193,8 @@ export default function PresupuestosView({
   const presupuestosFiltrados = presupuestos.filter((p) => {
     if (histCliente && !p.clienteNombre.toLowerCase().includes(histCliente.toLowerCase())) return false;
     if (histNumero && !p.numero.toLowerCase().includes(histNumero.toLowerCase())) return false;
-    if (histDesde && p.creadoEn.slice(0, 10) < histDesde) return false;
-    if (histHasta && p.creadoEn.slice(0, 10) > histHasta) return false;
+    if ((histDesde || histHasta) && p.creadoEn.slice(0, 10) < (histDesde || histHasta)) return false;
+    if ((histHasta || histDesde) && p.creadoEn.slice(0, 10) > (histHasta || histDesde)) return false;
     return true;
   });
 

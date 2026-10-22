@@ -75,8 +75,8 @@ export default function FacturasCompraTab({
       .filter((f) => {
         if (estado === "pendientes" && f.pagada) return false;
         if (estado === "pagadas" && !f.pagada) return false;
-        if (filtroDesde && f.fechaFactura < filtroDesde) return false;
-        if (filtroHasta && f.fechaFactura > filtroHasta) return false;
+        if ((filtroDesde || filtroHasta) && f.fechaFactura < (filtroDesde || filtroHasta)) return false;
+        if ((filtroHasta || filtroDesde) && f.fechaFactura > (filtroHasta || filtroDesde)) return false;
         if (!q) return true;
         const p = proveedores.find((pr) => pr.id === f.proveedorId);
         return p?.razonSocial.toLowerCase().includes(q);

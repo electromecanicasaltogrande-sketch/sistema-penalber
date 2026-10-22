@@ -25,8 +25,8 @@ export default function ReportePagosTab({
   const filtradas = useMemo(() => {
     return facturas.filter((f) => {
       if (proveedorId && f.proveedorId !== proveedorId) return false;
-      if (desde && f.fechaFactura < desde) return false;
-      if (hasta && f.fechaFactura > hasta) return false;
+      if ((desde || hasta) && f.fechaFactura < (desde || hasta)) return false;
+      if ((hasta || desde) && f.fechaFactura > (hasta || desde)) return false;
       return true;
     });
   }, [facturas, proveedorId, desde, hasta]);
