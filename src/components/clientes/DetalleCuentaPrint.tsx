@@ -9,6 +9,7 @@ import { saldo, type CtaCteComprobante } from "@/lib/clientes/types";
 export interface DetalleCuentaData {
   clienteNombre: string;
   clienteCuit: string;
+  clienteCodigo?: string;
   clienteDomicilio?: string;
   clienteLocalidad?: string;
   empresaCuit?: string;
@@ -36,7 +37,8 @@ function Contenido({ doc }: { doc: DetalleCuentaData }) {
       </div>
 
       <p className="mt-3">
-        <b>Cliente:</b> {doc.clienteNombre}
+        <b>Cliente:</b> {doc.clienteCodigo ? `${doc.clienteCodigo} ` : ""}
+        {doc.clienteNombre}
         {doc.clienteCuit ? ` · CUIT/CUIL: ${doc.clienteCuit}` : ""}
         {ubicacion ? ` / ${ubicacion}` : ""}
       </p>

@@ -81,6 +81,12 @@ export async function buildComprobanteDoc(venta: VentaRow): Promise<ComprobanteD
     iva: Number(it.iva),
   }));
 
+  let clienteCodigo: string | undefined;
+  if (venta.cliente_id) {
+    const { data: cli } = await supabase.from("clientes").select("codigo").eq("id", venta.cliente_id).maybeSingle();
+    if (cli?.codigo) clienteCodigo = String(cli.codigo);
+  }
+
   const empresa = EMPRESAS.find((e) => e.cuit === venta.empresa_cuit) ?? EMPRESAS[0];
   const formaPago = FORMAS_PAGO.find((f) => f.id === venta.condicion_pago)?.label ?? venta.condicion_pago;
 
@@ -89,6 +95,7 @@ export async function buildComprobanteDoc(venta: VentaRow): Promise<ComprobanteD
     numero: venta.numero,
     empresa,
     clienteNombre: venta.cliente_nombre,
+    clienteCodigo,
     dni: venta.dni ?? undefined,
     clienteTipoDoc: venta.cliente_tipo_doc ?? undefined,
     clienteDomicilio: venta.cliente_domicilio ?? undefined,

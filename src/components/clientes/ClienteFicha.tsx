@@ -183,7 +183,7 @@ export default function ClienteFicha({
         forma_pago: formaPago,
         descuento_10: descuento10,
       })
-      .select("id")
+      .select("id, numero")
       .single();
     if (pagoErr || !pago) throw pagoErr;
 
@@ -206,6 +206,7 @@ export default function ClienteFicha({
       }),
     );
     cargarPagos();
+    return (pago as { numero?: number | null }).numero ?? null;
   }
 
   async function marcarSeleccionadasPagas() {
@@ -217,8 +218,9 @@ export default function ClienteFicha({
       montoAplicado: descuento10 ? saldo(cp) * 0.9 : saldo(cp),
     }));
     const totalCobrado = aplicaciones.reduce((s, a) => s + a.montoAplicado, 0);
+    let numRecibo: number | null = null;
     try {
-      await persistirAplicaciones(totalCobrado, aplicaciones);
+      numRecibo = await persistirAplicaciones(totalCobrado, aplicaciones);
     } catch {
       return setError("No se pudo registrar el pago.");
     }
@@ -232,7 +234,8 @@ export default function ClienteFicha({
     );
     setRecibo({
       titulo: "RECIBO DE PAGO",
-      numero: `REC-${Date.now().toString().slice(-6)}`,
+      numero: numRecibo ? String(numRecibo).padStart(8, "0") : `REC-${Date.now().toString().slice(-6)}`,
+      clienteCodigo: cliente.codigo ? String(cliente.codigo) : undefined,
       cliente: cliente.razonSocial,
       fecha: new Date().toLocaleDateString("es-AR"),
       hora: new Date().toLocaleTimeString("es-AR"),
@@ -263,8 +266,9 @@ export default function ClienteFicha({
     if (aplicaciones.length === 0) {
       return setError("No hay comprobantes pendientes para aplicar el pago.");
     }
+    let numRecibo: number | null = null;
     try {
-      await persistirAplicaciones(aplicado, aplicaciones);
+      numRecibo = await persistirAplicaciones(aplicado, aplicaciones);
     } catch {
       return setError("No se pudo registrar el pago.");
     }
@@ -279,7 +283,8 @@ export default function ClienteFicha({
     );
     setRecibo({
       titulo: "RECIBO DE PAGO / ADELANTO",
-      numero: `REC-${Date.now().toString().slice(-6)}`,
+      numero: numRecibo ? String(numRecibo).padStart(8, "0") : `REC-${Date.now().toString().slice(-6)}`,
+      clienteCodigo: cliente.codigo ? String(cliente.codigo) : undefined,
       cliente: cliente.razonSocial,
       fecha: new Date().toLocaleDateString("es-AR"),
       hora: new Date().toLocaleTimeString("es-AR"),
@@ -479,6 +484,7 @@ export default function ClienteFicha({
                     setDetalleCuenta({
                       clienteNombre: cliente.razonSocial,
                       clienteCuit: cliente.cuit,
+                      clienteCodigo: cliente.codigo ? String(cliente.codigo) : undefined,
                       clienteDomicilio: cliente.direccion,
                       clienteLocalidad: cliente.localidad,
                       empresaCuit: empresaFiltro || (visibles[0]?.empresaCuit ?? ""),

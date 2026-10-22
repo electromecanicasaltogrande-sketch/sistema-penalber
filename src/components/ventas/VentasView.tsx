@@ -143,7 +143,7 @@ export default function VentasView({
           localidad: d.localidad,
           es_consumidor_final: false,
         })
-        .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default")
+        .select("id, razon_social, cuit, telefono, direccion, localidad, es_consumidor_final, tipo_comprobante_default, codigo")
         .single();
       if (err || !data) return "No se pudo guardar el cliente.";
       const nuevo = clienteFromRow(data as ClienteRow);
@@ -435,6 +435,7 @@ export default function VentasView({
         numero,
         empresa,
         clienteNombre: clienteLabel,
+        clienteCodigo: selectedCliente?.codigo ? String(selectedCliente.codigo) : undefined,
         dni: datosManuales?.numero || dni || undefined,
         clienteTipoDoc: datosManuales?.tipoDoc,
         clienteDomicilio: datosManuales?.domicilio || undefined,

@@ -24,6 +24,7 @@ export interface ReciboData {
   hora?: string;
   empresaCuit?: string;
   clienteCuit?: string;
+  clienteCodigo?: string;
   clienteDomicilio?: string;
   clienteLocalidad?: string;
   formaPago?: string;
@@ -77,7 +78,8 @@ function Contenido({ recibo }: { recibo: ReciboData }) {
 
       <div className="border-b line-40 py-2">
         <p>
-          <b>R.SOC/NOMBRE:</b> {recibo.cliente}
+          <b>R.SOC/NOMBRE:</b> {recibo.clienteCodigo ? `<<${recibo.clienteCodigo}>> ` : ""}
+          {recibo.cliente}
           {recibo.clienteCuit ? `   ${recibo.clienteCuit}` : ""}
         </p>
         <p>
