@@ -125,3 +125,113 @@ body {
     justify-content: space-between;
   }
 }
+
+/* ---------- Movimiento del Dashboard ---------- */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes dash-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dash-bar {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes dash-tip {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dash-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Entrada escalonada: cada bloque usa --i para su demora (50 ms entre uno y otro). */
+.dash-enter {
+  animation: dash-in 300ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+.dash-bar {
+  transform-origin: bottom;
+  animation: dash-bar 320ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 16ms + 100ms);
+  transition: opacity 140ms var(--ease-out);
+}
+
+.dash-tip {
+  transform-origin: top right;
+  animation: dash-tip 125ms var(--ease-out) both;
+}
+
+.dash-card {
+  transition:
+    transform 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.dash-press {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+.dash-press:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dash-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(27, 32, 40, 0.08);
+  }
+  .dash-bars:hover .dash-bar {
+    opacity: 0.55;
+  }
+  .dash-bars .dash-bar:hover {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-enter,
+  .dash-bar,
+  .dash-tip {
+    animation: dash-fade 200ms ease both;
+    animation-delay: 0ms;
+  }
+  .dash-card:hover {
+    transform: none;
+  }
+  .dash-press:active {
+    transform: none;
+  }
+}

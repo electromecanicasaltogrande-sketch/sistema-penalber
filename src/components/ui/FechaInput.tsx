@@ -53,6 +53,18 @@ export default function FechaInput({
       placeholder={placeholder}
       maxLength={10}
       aria-invalid={incompleto}
+      data-fecha=""
+      onFocus={(e) => e.currentTarget.select()}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter") return;
+        // Enter confirma la fecha y pasa a la siguiente del mismo grupo (de "desde" a "hasta");
+        // si era la última, termina: el filtro ya se aplicó con las fechas cargadas.
+        e.preventDefault();
+        const campos = Array.from(e.currentTarget.parentElement?.querySelectorAll<HTMLInputElement>("input[data-fecha]") ?? []);
+        const siguiente = campos[campos.indexOf(e.currentTarget) + 1];
+        if (siguiente) siguiente.focus();
+        else e.currentTarget.blur();
+      }}
       onChange={(e) => {
         const digitos = e.target.value.replace(/\D/g, "").slice(0, 8);
         const t = formatear(digitos);
