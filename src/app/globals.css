@@ -88,17 +88,12 @@ body {
     size: A4;
     margin: 8mm;
   }
-  body * {
-    visibility: hidden;
-  }
-  .print-only,
-  .print-only * {
-    visibility: visible;
+  /* Al imprimir solo queda el documento (montado en <body> por PrintPortal). */
+  body > :not(.print-only) {
+    display: none !important;
   }
   .print-only {
     display: block !important;
-    position: absolute;
-    inset: 0;
   }
   /* Cada hoja de factura/NC ocupa una página completa. */
   .print-page-full {
@@ -110,6 +105,9 @@ body {
     justify-content: space-between;
     break-after: page;
     page-break-after: always;
+  }
+  .print-page-full > * {
+    flex: 1;
   }
   .print-page-full:last-child {
     break-after: auto;

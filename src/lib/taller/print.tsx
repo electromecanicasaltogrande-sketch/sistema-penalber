@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { money } from "@/lib/format";
 import { descargarComoPDF } from "@/lib/print-pdf";
 import type { CartItem } from "@/lib/ventas/types";
+import PrintPortal from "@/components/ui/PrintPortal";
 
 export interface ReciboTallerData {
   titulo: string;
@@ -144,9 +145,9 @@ export default function ReciboTaller({ doc, onClose }: { doc: ReciboTallerData; 
         </div>
       </div>
 
-      <div className="print-only hidden print:block">
+      <PrintPortal>
         <Contenido doc={doc} />
-      </div>
+      </PrintPortal>
     </>
   );
 }

@@ -5,6 +5,7 @@ import { money } from "@/lib/format";
 import type { Empresa } from "@/lib/empresas";
 import { descargarComoPDF } from "@/lib/print-pdf";
 import { DOC_LABELS, type CartItem, type DocType } from "./types";
+import PrintPortal from "@/components/ui/PrintPortal";
 
 export interface ComprobanteDocData {
   docType: DocType;
@@ -143,7 +144,7 @@ function Copia({ doc, etiqueta }: { doc: ComprobanteDocData; etiqueta: string })
   const tipoDoc = doc.clienteTipoDoc && doc.clienteTipoDoc !== "SIN" ? doc.clienteTipoDoc : "DNI";
 
   return (
-    <div className="border line-70 p-5 text-[11px] text-black">
+    <div className="h-full border line-70 p-5 text-[11px] text-black print:p-6 print:text-[13px]">
       <div className="mb-2 text-center text-[10px] font-bold tracking-widest ink-60">{etiqueta}</div>
       <div className="flex items-start justify-between border-b line-40 pb-2">
         <div className="w-1/3">
@@ -320,6 +321,9 @@ function Copias({ doc }: { doc: ComprobanteDocData }) {
       <div data-pdf-page className="print-page-full bg-white p-6">
         <Copia doc={doc} etiqueta="DUPLICADO" />
       </div>
+      <div data-pdf-page className="print-page-full bg-white p-6">
+        <Copia doc={doc} etiqueta="TRIPLICADO" />
+      </div>
     </>
   );
 }
@@ -387,9 +391,9 @@ export default function ComprobantePrint({
         </div>
       </div>
 
-      <div className="print-only hidden print:block">
+      <PrintPortal>
         <Copias doc={doc} />
-      </div>
+      </PrintPortal>
     </>
   );
 }

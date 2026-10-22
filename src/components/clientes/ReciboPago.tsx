@@ -5,6 +5,7 @@ import { money } from "@/lib/format";
 import { descargarComoPDF } from "@/lib/print-pdf";
 import { EMPRESAS } from "@/lib/empresas";
 import { amountToWords } from "@/lib/ventas/print";
+import PrintPortal from "@/components/ui/PrintPortal";
 
 export interface ReciboLinea {
   comprobante: string;
@@ -190,9 +191,9 @@ export default function ReciboPago({ recibo, onClose }: { recibo: ReciboData; on
         </div>
       </div>
 
-      <div className="print-only hidden print:block">
+      <PrintPortal>
         <Contenido recibo={recibo} />
-      </div>
+      </PrintPortal>
     </>
   );
 }

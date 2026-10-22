@@ -1,5 +1,6 @@
 "use client";
 
+import PrintPortal from "@/components/ui/PrintPortal";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -335,7 +336,8 @@ export default function ArticulosView({
       )}
 
       {printing && (
-        <div className="print-only fixed inset-0 z-50 hidden bg-white p-8 print:block">
+        <PrintPortal>
+        <div className="bg-white p-8">
           <h2 className="mb-4 font-[family-name:var(--font-display)] text-lg font-bold">Listado de artículos</h2>
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -358,6 +360,7 @@ export default function ArticulosView({
             </tbody>
           </table>
         </div>
+        </PrintPortal>
       )}
     </div>
   );

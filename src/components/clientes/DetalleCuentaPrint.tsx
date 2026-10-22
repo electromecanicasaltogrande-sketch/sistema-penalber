@@ -5,6 +5,7 @@ import { money } from "@/lib/format";
 import { descargarComoPDF } from "@/lib/print-pdf";
 import { EMPRESAS } from "@/lib/empresas";
 import { saldo, type CtaCteComprobante } from "@/lib/clientes/types";
+import PrintPortal from "@/components/ui/PrintPortal";
 
 export interface DetalleCuentaData {
   clienteNombre: string;
@@ -138,9 +139,9 @@ export default function DetalleCuentaPrint({ doc, onClose }: { doc: DetalleCuent
         </div>
       </div>
 
-      <div className="print-only hidden print:block">
+      <PrintPortal>
         <Contenido doc={doc} />
-      </div>
+      </PrintPortal>
     </>
   );
 }

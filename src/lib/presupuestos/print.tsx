@@ -5,6 +5,7 @@ import { money } from "@/lib/format";
 import { descargarComoPDF } from "@/lib/print-pdf";
 import type { CartItem } from "@/lib/ventas/types";
 import type { PresupuestoConfig } from "./types";
+import PrintPortal from "@/components/ui/PrintPortal";
 
 export interface PresupuestoPrintData {
   numero: string;
@@ -140,9 +141,9 @@ export default function PresupuestoPrint({
         </div>
       </div>
 
-      <div className="print-only hidden print:block">
+      <PrintPortal>
         <Contenido doc={doc} />
-      </div>
+      </PrintPortal>
     </>
   );
 }
