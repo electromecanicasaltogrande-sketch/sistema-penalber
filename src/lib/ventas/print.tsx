@@ -179,7 +179,14 @@ function Copia({ doc, etiqueta, items, pagina, paginas, compacto }: CopiaProps) 
   const emp = doc.empresa;
   const barras = isRemito ? null : codigoBarrasAfip(doc, codTipo);
   const numero = doc.numero.replace(/^[A-Z ]+/, "");
-  const tipoDoc = doc.clienteTipoDoc && doc.clienteTipoDoc !== "SIN" ? doc.clienteTipoDoc : "DNI";
+  const digitosDoc = (doc.dni ?? "").replace(/\D/g, "");
+  const tipoDoc =
+    doc.clienteTipoDoc && doc.clienteTipoDoc !== "SIN" ? doc.clienteTipoDoc : digitosDoc.length === 11 ? "CUIT" : "DNI";
+  const condIva = doc.clienteCondicionIva
+    ? /^responsable/i.test(doc.clienteCondicionIva)
+      ? "IVA RESPONSABLE INSCRIPTO"
+      : doc.clienteCondicionIva.toUpperCase()
+    : "";
   const mostrarNeto = esA || isRemito;
   const num = "whitespace-nowrap pl-2 text-right tabular-nums";
 
@@ -249,7 +256,7 @@ function Copia({ doc, etiqueta, items, pagina, paginas, compacto }: CopiaProps) 
         </p>
         <p>
           <b>CONDICIÓN:</b> {doc.condicionPagoLabel}
-          {doc.clienteCondicionIva ? `     ${doc.clienteCondicionIva.toUpperCase()}` : ""}
+          {condIva ? `     ${condIva}` : ""}
         </p>
       </div>
 

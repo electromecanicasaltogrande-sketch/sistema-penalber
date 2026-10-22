@@ -82,8 +82,14 @@ export async function buildComprobanteDoc(venta: VentaRow): Promise<ComprobanteD
   }));
 
   let clienteCodigo: string | undefined;
+  let cli: { codigo: number | null; cuit: string; direccion: string; localidad: string; condicion_iva: string | null } | null = null;
   if (venta.cliente_id) {
-    const { data: cli } = await supabase.from("clientes").select("codigo").eq("id", venta.cliente_id).maybeSingle();
+    const { data } = await supabase
+      .from("clientes")
+      .select("codigo, cuit, direccion, localidad, condicion_iva")
+      .eq("id", venta.cliente_id)
+      .maybeSingle();
+    cli = data;
     if (cli?.codigo) clienteCodigo = String(cli.codigo);
   }
 
@@ -96,11 +102,11 @@ export async function buildComprobanteDoc(venta: VentaRow): Promise<ComprobanteD
     empresa,
     clienteNombre: venta.cliente_nombre,
     clienteCodigo,
-    dni: venta.dni ?? undefined,
+    dni: venta.dni || cli?.cuit || undefined,
     clienteTipoDoc: venta.cliente_tipo_doc ?? undefined,
-    clienteDomicilio: venta.cliente_domicilio ?? undefined,
-    clienteLocalidad: venta.cliente_localidad ?? undefined,
-    clienteCondicionIva: CONDICIONES_IVA.find((c) => c.id === venta.cliente_condicion_iva)?.label,
+    clienteDomicilio: venta.cliente_domicilio || cli?.direccion || undefined,
+    clienteLocalidad: venta.cliente_localidad || cli?.localidad || undefined,
+    clienteCondicionIva: CONDICIONES_IVA.find((c) => c.id === (venta.cliente_condicion_iva || cli?.condicion_iva))?.label,
     condicionPagoLabel: venta.condicion_pago === "nc" ? "Nota de crédito" : formaPago,
     items,
     subtotal: Number(venta.subtotal),

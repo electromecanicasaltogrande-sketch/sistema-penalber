@@ -436,13 +436,13 @@ export default function VentasView({
         empresa,
         clienteNombre: clienteLabel,
         clienteCodigo: selectedCliente?.codigo ? String(selectedCliente.codigo) : undefined,
-        dni: datosManuales?.numero || dni || undefined,
+        dni: datosManuales?.numero || dni || (selectedCliente && !selectedCliente.esConsumidorFinal ? selectedCliente.cuit : "") || undefined,
         clienteTipoDoc: datosManuales?.tipoDoc,
-        clienteDomicilio: datosManuales?.domicilio || undefined,
-        clienteLocalidad: datosManuales?.localidad || undefined,
-        clienteCondicionIva: datosManuales
-          ? CONDICIONES_IVA.find((c) => c.id === datosManuales.condicionIva)?.label
-          : undefined,
+        clienteDomicilio: datosManuales?.domicilio || selectedCliente?.direccion || undefined,
+        clienteLocalidad: datosManuales?.localidad || selectedCliente?.localidad || undefined,
+        clienteCondicionIva: CONDICIONES_IVA.find(
+          (c) => c.id === (datosManuales ? datosManuales.condicionIva : selectedCliente?.condicionIva),
+        )?.label,
         condicionPagoLabel: isNC
           ? "Nota de crédito"
           : (FORMAS_PAGO.find((f) => f.id === condicionPago)?.label ?? condicionPago),
