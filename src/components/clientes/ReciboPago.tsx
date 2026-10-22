@@ -3,11 +3,14 @@
 import { useRef, useState } from "react";
 import { money } from "@/lib/format";
 import { descargarComoPDF } from "@/lib/print-pdf";
+import { EMPRESAS } from "@/lib/empresas";
+import { amountToWords } from "@/lib/ventas/print";
 
 export interface ReciboLinea {
   comprobante: string;
   detalle: string;
   monto: number;
+  fecha?: string;
 }
 
 export interface ReciboData {
@@ -18,49 +21,112 @@ export interface ReciboData {
   totalAplicado: number;
   saldoRestante: number;
   fecha: string;
+  hora?: string;
+  empresaCuit?: string;
+  clienteCuit?: string;
+  clienteDomicilio?: string;
+  clienteLocalidad?: string;
+  formaPago?: string;
 }
 
 function Contenido({ recibo }: { recibo: ReciboData }) {
+  const emp = EMPRESAS.find((e) => e.cuit === recibo.empresaCuit) ?? EMPRESAS[0];
   return (
-    <div className="bg-white p-8 text-black">
-      <h2 className="mb-1 font-[family-name:var(--font-display)] text-lg font-bold">{recibo.titulo}</h2>
-      <p className="mb-4 text-xs ink-60">
-        {recibo.numero} · {recibo.fecha} · {recibo.cliente}
+    <div className="bg-white p-8 text-[12px] text-black">
+      <div className="flex items-start justify-between border-b line-40 pb-3">
+        <div className="w-1/3">
+          <p className="font-bold">{emp.razonSocial}</p>
+          <p className="mt-1 leading-snug ink-70">
+            {emp.titular.toUpperCase()}
+            <br />
+            {emp.domicilio}
+            <br />
+            Tel.: {emp.telefono}
+            {emp.email && (
+              <>
+                <br />
+                e-mail: {emp.email}
+              </>
+            )}
+            {emp.whatsapp && (
+              <>
+                <br />
+                WhatsApp {emp.whatsapp}
+              </>
+            )}
+            <br />
+            {emp.condicionIva}
+          </p>
+        </div>
+        <div className="flex w-16 flex-col items-center border line-50 py-1 text-center">
+          <span className="text-2xl font-bold">X</span>
+          <span className="text-[7px] leading-tight">DOCUMENTO NO VÁLIDO COMO FACTURA</span>
+        </div>
+        <div className="w-1/3 text-right">
+          <p className="font-bold uppercase">{recibo.titulo}</p>
+          <p>N° {recibo.numero}</p>
+          <p className="mt-1.5">CUIT: {emp.cuit}</p>
+          <p>Inicio Act.: {emp.inicioActividades}</p>
+          <p>Ingresos Brutos: {emp.ingresosBrutos}</p>
+          <p>
+            Fecha: {recibo.fecha}
+            {recibo.hora ? ` ${recibo.hora}` : ""}
+          </p>
+        </div>
+      </div>
+
+      <div className="border-b line-40 py-2">
+        <p>
+          <b>R.SOC/NOMBRE:</b> {recibo.cliente}
+          {recibo.clienteCuit ? `   ${recibo.clienteCuit}` : ""}
+        </p>
+        <p>
+          <b>DIRECCIÓN:</b> {recibo.clienteDomicilio ?? ""}
+        </p>
+        <p>
+          <b>LOCALIDAD:</b> {recibo.clienteLocalidad ?? ""}
+        </p>
+      </div>
+
+      <p className="mt-3">
+        Recibí de <b>{recibo.cliente}</b> la cantidad de <b>PESOS {amountToWords(recibo.totalAplicado)}</b>
       </p>
-      <table className="w-full border-collapse text-sm">
+      <p className="mt-1">para ser afectados a los siguientes comprobantes:</p>
+
+      <table className="mt-3 w-full border-collapse">
         <thead>
-          <tr className="border-b line-30 text-left">
-            <th className="py-1.5">Comprobante</th>
-            <th className="py-1.5">Detalle</th>
-            <th className="py-1.5 text-right">Monto</th>
+          <tr className="border-b line-40 text-left">
+            <th className="py-1">Comprobante imputado</th>
+            <th className="py-1">Fecha</th>
+            <th className="py-1">Detalle</th>
+            <th className="py-1 text-right">Importe</th>
           </tr>
         </thead>
         <tbody>
           {recibo.lineas.map((l, i) => (
             <tr key={i} className="border-b line-10">
-              <td className="py-1.5">{l.comprobante}</td>
-              <td className="py-1.5">{l.detalle}</td>
-              <td className="py-1.5 text-right">{money(l.monto)}</td>
+              <td className="py-1">{l.comprobante}</td>
+              <td className="py-1">{l.fecha ?? ""}</td>
+              <td className="py-1">{l.detalle}</td>
+              <td className="py-1 text-right">{l.monto.toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      <p className="mt-4 font-bold">Valores recibidos:</p>
+      <p>
+        {recibo.formaPago ?? "Efectivo"} - Importe: {recibo.totalAplicado.toFixed(2)}
+      </p>
+
       <div className="mt-4 flex justify-end">
-        <div className="w-56 text-sm">
-          <div className="flex justify-between border-b line-10 py-1">
-            <span>Total aplicado</span>
-            <b>{money(recibo.totalAplicado)}</b>
-          </div>
-          <div className="flex justify-between py-1">
-            <span>Saldo restante</span>
-            <b>{money(recibo.saldoRestante)}</b>
-          </div>
+        <div className="w-64 text-right">
+          <p className="border-t line-40 pt-1.5 text-sm font-bold">MONTO TOTAL RECIBO: {recibo.totalAplicado.toFixed(2)}</p>
+          <p className="mt-1 ink-60">Saldo restante: {money(recibo.saldoRestante)}</p>
         </div>
       </div>
-      <div className="mt-16 flex justify-end">
-        <div className="w-56 border-t line-40 pt-1.5 text-center text-xs ink-60">
-          Firma / Aclaración
-        </div>
+      <div className="mt-14 flex justify-end">
+        <div className="w-56 border-t line-40 pt-1.5 text-center text-xs ink-60">Firma / Aclaración</div>
       </div>
     </div>
   );

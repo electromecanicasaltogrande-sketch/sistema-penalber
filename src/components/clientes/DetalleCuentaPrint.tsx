@@ -3,57 +3,62 @@
 import { useRef, useState } from "react";
 import { money } from "@/lib/format";
 import { descargarComoPDF } from "@/lib/print-pdf";
-import { empresaCorta } from "@/lib/empresas";
+import { EMPRESAS } from "@/lib/empresas";
 import { saldo, type CtaCteComprobante } from "@/lib/clientes/types";
 
 export interface DetalleCuentaData {
   clienteNombre: string;
   clienteCuit: string;
+  clienteDomicilio?: string;
+  clienteLocalidad?: string;
+  empresaCuit?: string;
   comprobantes: CtaCteComprobante[];
   fecha: string;
+  hora?: string;
 }
 
 function Contenido({ doc }: { doc: DetalleCuentaData }) {
   const totalDeuda = doc.comprobantes.reduce((s, c) => s + saldo(c), 0);
+  const emp = EMPRESAS.find((e) => e.cuit === doc.empresaCuit) ?? EMPRESAS[0];
+  const ubicacion = [doc.clienteDomicilio, doc.clienteLocalidad].filter(Boolean).join(" - ");
   return (
-    <div className="bg-white p-8 text-black">
+    <div className="bg-white p-8 text-[12px] text-black">
+      <p className="text-right ink-60">
+        {doc.fecha} {doc.hora ?? ""}
+      </p>
       <div className="flex items-start justify-between border-b line-40 pb-3">
         <div>
-          <p className="font-bold">Electrotécnica Peñalber</p>
-          <p className="text-xs ink-70">Tavella 1487, Concordia, Entre Ríos</p>
+          <p className="font-bold">{emp.domicilio}</p>
+          {emp.whatsapp && <p className="ink-70">{emp.whatsapp}</p>}
+          {emp.email && <p className="ink-70">{emp.email}</p>}
         </div>
-        <div className="text-right">
-          <p className="font-bold">DETALLE DE CUENTA</p>
-          <p className="text-xs">Fecha: {doc.fecha}</p>
-        </div>
+        <p className="text-lg font-bold">Estado de Deuda</p>
       </div>
 
-      <p className="mt-4 text-sm">
-        <b>Cliente:</b> {doc.clienteNombre} {doc.clienteCuit ? `· CUIT/CUIL: ${doc.clienteCuit}` : ""}
+      <p className="mt-3">
+        <b>Cliente:</b> {doc.clienteNombre}
+        {doc.clienteCuit ? ` · CUIT/CUIL: ${doc.clienteCuit}` : ""}
+        {ubicacion ? ` / ${ubicacion}` : ""}
       </p>
 
-      <table className="mt-3 w-full border-collapse text-sm">
+      <table className="mt-3 w-full border-collapse">
         <thead>
           <tr className="border-b line-40 text-left">
-            <th className="py-1.5">Fecha</th>
-            <th className="py-1.5">Comprobante</th>
-            <th className="py-1.5">Empresa</th>
-            <th className="py-1.5 text-right">Total</th>
-            <th className="py-1.5 text-right">Pagado</th>
-            <th className="py-1.5 text-right">Saldo</th>
+            <th className="py-1">Fecha</th>
+            <th className="py-1">Descripción</th>
+            <th className="py-1 text-right">Debe</th>
+            <th className="py-1 text-right">Haber</th>
           </tr>
         </thead>
         <tbody>
           {doc.comprobantes.map((cp) => (
             <tr key={cp.id} className="border-b line-10">
-              <td className="py-1.5">{cp.fecha}</td>
-              <td className="py-1.5">
-                {cp.tipo} — {cp.numero}
+              <td className="py-1">{fechaCorta(cp.fecha)}</td>
+              <td className="py-1">
+                {cp.tipo} {cp.numero}
               </td>
-              <td className="py-1.5">{empresaCorta(cp.empresaCuit)}</td>
-              <td className="py-1.5 text-right">{money(cp.total)}</td>
-              <td className="py-1.5 text-right">{money(cp.montoPagado)}</td>
-              <td className="py-1.5 text-right">{money(saldo(cp))}</td>
+              <td className="py-1 text-right">{cp.total.toFixed(2)}</td>
+              <td className="py-1 text-right">{cp.montoPagado.toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
@@ -61,11 +66,16 @@ function Contenido({ doc }: { doc: DetalleCuentaData }) {
 
       <div className="mt-3 flex justify-end">
         <div className="w-64 border-t line-40 pt-1.5 text-right text-base font-bold">
-          Saldo total adeudado: {money(totalDeuda)}
+          Saldo Total {totalDeuda.toFixed(2)}
         </div>
       </div>
     </div>
   );
+}
+
+function fechaCorta(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return y && m && d ? `${d}/${m}/${y}` : iso;
 }
 
 export default function DetalleCuentaPrint({ doc, onClose }: { doc: DetalleCuentaData; onClose: () => void }) {

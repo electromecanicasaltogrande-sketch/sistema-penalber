@@ -60,7 +60,7 @@ function enLetras(n: number): string {
   return partes.join(" ");
 }
 
-function amountToWords(n: number): string {
+export function amountToWords(n: number): string {
   const cent = Math.round(n * 100);
   return `${enLetras(Math.floor(cent / 100))} con ${cent % 100}/100.-`;
 }

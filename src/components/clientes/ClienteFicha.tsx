@@ -15,7 +15,7 @@ import {
   type CtaCteComprobanteRow,
 } from "@/lib/clientes/types";
 import { distribuirPago } from "@/lib/clientes/payment";
-import { DOC_LABELS } from "@/lib/ventas/types";
+import { DOC_LABELS, FORMAS_PAGO } from "@/lib/ventas/types";
 import { CONDICIONES_IVA } from "@/lib/clientes/documento";
 import ReciboPago, { type ReciboData } from "./ReciboPago";
 import DetalleCuentaPrint, { type DetalleCuentaData } from "./DetalleCuentaPrint";
@@ -235,6 +235,12 @@ export default function ClienteFicha({
       numero: `REC-${Date.now().toString().slice(-6)}`,
       cliente: cliente.razonSocial,
       fecha: new Date().toLocaleDateString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR"),
+      empresaCuit: empresaFiltro || (targets[0]?.empresaCuit ?? ""),
+      clienteCuit: cliente.cuit,
+      clienteDomicilio: cliente.direccion,
+      clienteLocalidad: cliente.localidad,
+      formaPago: FORMAS_PAGO.find((f) => f.id === formaPago)?.label ?? formaPago,
       lineas: targets.map((cp, i) => ({
         comprobante: `${cp.tipo} — ${cp.numero}`,
         detalle: descuento10 ? "10% off" : "",
@@ -276,6 +282,12 @@ export default function ClienteFicha({
       numero: `REC-${Date.now().toString().slice(-6)}`,
       cliente: cliente.razonSocial,
       fecha: new Date().toLocaleDateString("es-AR"),
+      hora: new Date().toLocaleTimeString("es-AR"),
+      empresaCuit: empresaFiltro || (aplicaciones[0]?.comprobante?.empresaCuit ?? ""),
+      clienteCuit: cliente.cuit,
+      clienteDomicilio: cliente.direccion,
+      clienteLocalidad: cliente.localidad,
+      formaPago: FORMAS_PAGO.find((f) => f.id === formaPago)?.label ?? formaPago,
       lineas: aplicaciones.map((a) => ({
         comprobante: `${a.comprobante.tipo} — ${a.comprobante.numero}`,
         detalle: `Saldo restante ${money(a.saldoRestante)}`,
@@ -467,6 +479,10 @@ export default function ClienteFicha({
                     setDetalleCuenta({
                       clienteNombre: cliente.razonSocial,
                       clienteCuit: cliente.cuit,
+                      clienteDomicilio: cliente.direccion,
+                      clienteLocalidad: cliente.localidad,
+                      empresaCuit: empresaFiltro || (visibles[0]?.empresaCuit ?? ""),
+                      hora: new Date().toLocaleTimeString("es-AR"),
                       comprobantes:
                         seleccionDetalle.size > 0
                           ? visibles.filter((cp) => seleccionDetalle.has(cp.id))
