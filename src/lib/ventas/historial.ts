@@ -104,5 +104,6 @@ export async function buildComprobanteDoc(venta: VentaRow): Promise<ComprobanteD
       ? new Date(venta.cae_vencimiento).toLocaleDateString("es-AR")
       : undefined,
     fecha: new Date(venta.creado_en).toLocaleDateString("es-AR"),
+    hora: new Date(venta.creado_en).toLocaleTimeString("es-AR"),
   };
 }

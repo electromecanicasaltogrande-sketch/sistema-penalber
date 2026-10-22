@@ -452,6 +452,7 @@ export default function VentasView({
         cae,
         caeVencimiento,
         fecha: new Date().toLocaleDateString("es-AR"),
+        hora: new Date().toLocaleTimeString("es-AR"),
       });
 
       setCart([]);

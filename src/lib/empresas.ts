@@ -8,6 +8,8 @@ export interface Empresa {
   ingresosBrutos: string;
   inicioActividades: string;
   condicionIva: string;
+  email?: string;
+  whatsapp?: string;
 }
 
 export const EMPRESAS: Empresa[] = [
@@ -21,6 +23,8 @@ export const EMPRESAS: Empresa[] = [
     ingresosBrutos: "20245944064",
     inicioActividades: "01/07/2015",
     condicionIva: "Responsable Inscripto",
+    email: "rmpenalber@yahoo.com.ar",
+    whatsapp: "3454052481",
   },
   {
     cuit: "20080390174",
@@ -32,6 +36,8 @@ export const EMPRESAS: Empresa[] = [
     ingresosBrutos: "20080390174",
     inicioActividades: "04/01/2017",
     condicionIva: "Responsable Inscripto",
+    email: "rmpenalber@yahoo.com.ar",
+    whatsapp: "3454052481",
   },
 ];
 
